@@ -49,6 +49,17 @@ namespace TestLoadLib
                 5<<16,  6<<16, 7<<16,  8<<16,
                 9<<16, 10<<16, 11<<16,  12<<16,
             };
+            //test2
+            int[] outputData = new int[inputData.Length];
+            unsafe
+            {
+                fixed (int* output_h = &outputData[0])
+                fixed (int* h = &inputData[0])
+                {
+                    simple_ispc.NativeMethods.flipY_and_swap(h, output_h, 4, 3);
+                }
+            }
+
             unsafe
             {
                 fixed (int* h = &inputData[0])
@@ -57,16 +68,7 @@ namespace TestLoadLib
                 }
             }
 
-            //test2
-            //int[] outputData = new int[inputData.Length];
-            //unsafe
-            //{
-            //    fixed (int* output_h = &outputData[0])
-            //    fixed (int* h = &inputData[0])
-            //    {
-            //        flipY_and_swap_((IntPtr)h, (IntPtr)output_h, 4, 3);
-            //    }
-            //}
+
         }
 
 
