@@ -2,8 +2,8 @@
 using System;
 using System.Collections.Generic;
 
-using System.IO; 
-using System.Text; 
+using System.IO;
+using System.Text;
 namespace TestLoadLib
 {
     enum ProjectConfigKind
@@ -35,7 +35,7 @@ namespace TestLoadLib
     //create from visual studio 2019 vc project file.
     //not from official documentation
 
-    public class SimpleVcxProjGen
+    class SimpleVcxProjGen
     {
         //simple create xml document for vcx proj
         string _projFileVersion = "10.0.20506.1";
@@ -50,7 +50,7 @@ namespace TestLoadLib
 
         string _platform = "x64";
         ProjectConfigKind _proj_config;
-        ProjectOutputKind _proj_outputKind;
+      
         List<InputItem> _inputs = new List<InputItem>();
 
 
@@ -83,22 +83,26 @@ namespace TestLoadLib
                 Include = sourceFile
             });
         }
+
+        public ProjectOutputKind ProjectOutputKind { get; set; } = ProjectOutputKind.DynamicLibrary;
+
         internal VcxProject CreateVcxTemplate()
         {
             VcxProject proj = new VcxProject();
             {
                 _proj_config = ProjectConfigKind.Debug;
-                _proj_outputKind = ProjectOutputKind.DynamicLibrary;
+                 
+                ConfigSetup();
                 ProjectConfiguration projConfig = NewProjectConfig();
                 proj.Configurations.Add(projConfig);
             }
             {
                 _proj_config = ProjectConfigKind.Release;
-                _proj_outputKind = ProjectOutputKind.Application;
+                 
+                ConfigSetup();
                 ProjectConfiguration projConfig = NewProjectConfig();
                 proj.Configurations.Add(projConfig);
             }
-
 
             GlobalsPropertyGroup globalsProp = proj.GlobalsPropertyGroup;
             globalsProp.ProjectGuid = "{" + Guid.NewGuid() + "}";
@@ -139,53 +143,68 @@ namespace TestLoadLib
 
             return proj;
         }
-        ProjectConfiguration NewProjectConfig()
-        {
-            string config = "";
-            string linkIncremental = "";
-            string configType = "";
-            string extension = "";
+        string _config = "";
+        string _linkIncremental = "";
+        string _configType = "";
+        string _extension = "";
+        string _outdir = "";
 
+        string _finalProductFilename;
+
+
+        void ConfigSetup()
+        {
             switch (_proj_config)
             {
                 default: throw new NotSupportedException();
                 case ProjectConfigKind.Debug:
                     {
-                        config = "Debug";
-                        linkIncremental = "true";
+                        _config = "Debug";
+                        _linkIncremental = "true";
                     }
                     break;
                 case ProjectConfigKind.Release:
                     {
-                        config = "Release";
-                        linkIncremental = "false";
+                        _config = "Release";
+                        _linkIncremental = "false";
                     }
                     break;
             }
-
-            switch (_proj_outputKind)
+            switch (ProjectOutputKind)
             {
                 default: throw new NotSupportedException();
                 case ProjectOutputKind.Application:
-                    configType = "Application";
-                    extension = ".exe";
+                    _configType = "Application";
+                    _extension = ".exe";
                     break;
                 case ProjectOutputKind.DynamicLibrary:
-                    configType = "DynamicLibrary";
-                    extension = ".dll";
+                    _configType = "DynamicLibrary";
+                    _extension = ".dll";
                     break;
             }
+            _outdir = FullProjBuildPath + "\\" + ProjectName + "\\" + _config + "\\";
+            _finalProductFilename = _outdir + "\\" + ProjectName + _extension;
+        }
 
+
+        public string GetFinalProductName(ProjectConfigKind configKind)
+        {
+            ConfigSetup();
+            return _finalProductFilename;
+        }
+
+        ProjectConfiguration NewProjectConfig()
+        {
             //----------------
-            string combine = config + "|" + _platform;
+            string combine = _config + "|" + _platform;
             var conf = new ProjectConfiguration()
             {
-                Configuration = config,
+                Configuration = _config,
                 Platform = _platform,
                 Include = combine,
                 Config = new ConfigurationPropertyGroup()
                 {
-                    ConfigurationType = configType,
+                    ConfigurationType = _configType,
                     CharacterSet = _charset,
                     PlatformToolset = _platformToolSet,
                 }
@@ -207,12 +226,13 @@ namespace TestLoadLib
             configGroup.ConditionConfig = conditionConfig;
 
             configGroup.Condition = conditionConfig.Condition = "'$(Configuration)|$(Platform)'=='" + combine + "'";
-            conditionConfig.OutDir = FullProjBuildPath + "\\" + ProjectName + "\\" + config + "\\";
-            conditionConfig.IntDir = ProjectName + ".dir\\" + config + "\\";
-            conditionConfig.TargetName = ProjectName;
-            conditionConfig.TargetExt = extension;
 
-            conditionConfig.LinkIncremental = linkIncremental;
+            conditionConfig.OutDir = _outdir;
+            conditionConfig.IntDir = ProjectName + ".dir\\" + _config + "\\";
+            conditionConfig.TargetName = ProjectName;
+            conditionConfig.TargetExt = _extension;
+
+            conditionConfig.LinkIncremental = _linkIncremental;
             conditionConfig.GenerateManifest = "true";
 
             //----
@@ -224,8 +244,8 @@ namespace TestLoadLib
             clCompile.FloatingPointModel = "Fast";
 
             //debug
-            string cl_output_dir = "";
-            string cl_output = "";
+
+
 
             if (_proj_config == ProjectConfigKind.Debug)
             {
@@ -236,7 +256,6 @@ namespace TestLoadLib
                 clCompile.RuntimeLibrary = "MultiThreadedDebugDLL";
                 clCompile.PreprocessorDefinitions = "WIN32;_WINDOWS;CMAKE_INTDIR=\"Debug\";%(PreprocessorDefinitions)";
 
-                cl_output_dir = FullProjBuildPath + "/" + ProjectName + "/Debug";
             }
             else
             {
@@ -246,10 +265,7 @@ namespace TestLoadLib
                 clCompile.RuntimeLibrary = "MultiThreadedDLL";
                 clCompile.PreprocessorDefinitions = "WIN32;_WINDOWS;NDEBUG;CMAKE_INTDIR=\"Release\";%(PreprocessorDefinitions)";
 
-                cl_output_dir = FullProjBuildPath + "/" + ProjectName + "/Release";
             }
-
-            cl_output = cl_output_dir + "/" + ProjectName + ".lib";
 
 
             clCompile.ObjectFileName = _initDir;
@@ -290,8 +306,9 @@ namespace TestLoadLib
             link.AdditionalLibraryDirectories = "%(AdditionalLibraryDirectories)";
             link.AdditionalOptions = "%(AdditionalOptions) " + link_additional_opts; //***
             link.SubSystem = "Console";
-            link.ProgramDataBaseFile = cl_output = cl_output_dir + "/" + ProjectName + ".pdb";
-            link.ImportLibrary = cl_output_dir + "/" + ProjectName + ".lib";
+
+            link.ProgramDataBaseFile = _outdir + "/" + ProjectName + ".pdb";
+            link.ImportLibrary = _outdir + "/" + ProjectName + ".lib";
 
             if (_proj_config == ProjectConfigKind.Debug)
             {

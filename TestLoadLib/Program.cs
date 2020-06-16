@@ -140,15 +140,19 @@ namespace TestLoadLib
             //more easier
             //----------
 
+
+            ProjectConfigKind configKind = ProjectConfigKind.Debug;
+
             SimpleVcxProjGen gen = new SimpleVcxProjGen();
             //set some proprties
             gen.ProjectName = "simple"; //project name and output            
 
             string current_dir = Directory.GetCurrentDirectory();
             string tmp_dir = current_dir + "/temp";
-
             gen.FullProjSrcPath = current_dir;
             gen.FullProjBuildPath = tmp_dir;
+
+            string finalProductName = gen.GetFinalProductName(configKind);
 
             {
                 //build ispc                 
@@ -157,10 +161,9 @@ namespace TestLoadLib
                 if (!Directory.Exists(tmp_dir))
                 {
                     Directory.CreateDirectory(tmp_dir);
-                } 
+                }
 
                 string ispc_src = "simple.ispc";
-
                 string ispc_obj = tmp_dir + "/simple_ispc.obj";
                 string ispc_header = tmp_dir + "/simple_ispc.h";
 
@@ -194,7 +197,23 @@ namespace TestLoadLib
             string vxs_projOutputFilename = "test2_1.xml.vcxproj";
             File.WriteAllText(vxs_projOutputFilename, xmlOutput.Output.ToString());
 
-            System.Diagnostics.Process proc1 = System.Diagnostics.Process.Start(MSBUILD_PATH, vxs_projOutputFilename + " /p:configuration=debug");
+            //debug build or release build
+
+            string p_config = "";
+            switch (configKind)
+            {
+                default: throw new NotSupportedException();
+                case ProjectConfigKind.Debug:
+                    p_config = " /p:configuration=debug";
+                    break;
+                case ProjectConfigKind.Release:
+                    p_config = " /p:configuration=release";
+                    break;
+            }
+
+
+
+            System.Diagnostics.Process proc1 = System.Diagnostics.Process.Start(MSBUILD_PATH, vxs_projOutputFilename + p_config);
             proc1.WaitForExit();
             int exit_code1 = proc1.ExitCode;
             if (exit_code1 != 0)
@@ -203,7 +222,7 @@ namespace TestLoadLib
             }
 
             //build pass, then copy the result dll back             
-            IntPtr dllPtr = LoadLibrary(@"temp\simple\Debug\simple.dll");
+            IntPtr dllPtr = LoadLibrary(finalProductName);
 
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
 
