@@ -137,6 +137,10 @@ namespace TestLoadLib
             //from cu=> we generate interface c 
             CodeStringBuilder sb = new CodeStringBuilder();
             sb.AppendLine("//AUTOGEN," + DateTime.Now.ToString("s"));
+            sb.AppendLine("//Tools: ispc and BridgeBuilder");
+            sb.AppendLine("//Src: " + ispc_headerFilename);
+            sb.AppendLine();
+
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Runtime.InteropServices;");
 
@@ -249,14 +253,14 @@ namespace TestLoadLib
             //----------
             //now read auto-gen header
 
-            string c_interface_filename = gen.FullProjSrcPath + "/simple/simple.cpp";
+            string c_interface_filename = gen.FullProjSrcPath + "/simple.cpp";
             GenerateCBinder(ispc_header, c_interface_filename);
 
-            string cs_method_invoke_filename = "simple.cs";
+            string cs_method_invoke_filename = "simple.cs"; //save to
             GenerateCsBinder(ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
             //move cs code to src folder
-
-
+            string targetCsFile = "..\\..\\AutoGenBinders\\simple.cs"; 
+            MoveFileOrReplaceIfExists(cs_method_invoke_filename, targetCsFile);
             //
             //at this step we have object file and header
             //build a cpp dll with msbuild  
@@ -296,8 +300,17 @@ namespace TestLoadLib
             }
 
             //build pass, then copy the result dll back     
+            MoveFileOrReplaceIfExists(finalProductName, Path.GetFileName(finalProductName));
 
-            File.Move(finalProductName, Path.GetFileName(finalProductName));
+        }
+        static void MoveFileOrReplaceIfExists(string src, string dest)
+        {
+            if (File.Exists(dest))
+            {
+                //delete
+                File.Delete(dest);
+            }
+            File.Move(src, dest);
         }
         static void Main(string[] args)
         {
