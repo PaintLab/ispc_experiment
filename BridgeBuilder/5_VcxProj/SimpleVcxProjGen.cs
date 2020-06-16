@@ -4,7 +4,8 @@ using System.Collections.Generic;
 
 using System.IO;
 using System.Text;
-namespace TestLoadLib
+
+namespace BridgeBuilder.Vcx
 {
     enum ProjectConfigKind
     {
@@ -50,7 +51,7 @@ namespace TestLoadLib
 
         string _platform = "x64";
         ProjectConfigKind _proj_config;
-      
+
         List<InputItem> _inputs = new List<InputItem>();
 
 
@@ -91,14 +92,14 @@ namespace TestLoadLib
             VcxProject proj = new VcxProject();
             {
                 _proj_config = ProjectConfigKind.Debug;
-                 
+
                 ConfigSetup();
                 ProjectConfiguration projConfig = NewProjectConfig();
                 proj.Configurations.Add(projConfig);
             }
             {
                 _proj_config = ProjectConfigKind.Release;
-                 
+
                 ConfigSetup();
                 ProjectConfiguration projConfig = NewProjectConfig();
                 proj.Configurations.Add(projConfig);
@@ -189,6 +190,7 @@ namespace TestLoadLib
 
         public string GetFinalProductName(ProjectConfigKind configKind)
         {
+            _proj_config = configKind;
             ConfigSetup();
             return _finalProductFilename;
         }

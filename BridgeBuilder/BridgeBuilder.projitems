@@ -16,5 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)2_ApiParser\Token.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)3_Symbols\TypePlan.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)4_CodeGen\CodeStringBuilder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)5_VcxProj\SimpleVcxProjGen.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)6_Ispc\IspcBuilder.cs" />
   </ItemGroup>
 </Project>
