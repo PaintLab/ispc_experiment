@@ -4,108 +4,15 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.IO;
 
+using BridgeBuilder;
+
 namespace TestLoadLib
 {
-    class ExportFunc
-    {
-        public string OriginalName { get; private set; }
-        public string ProperCsName { get; private set; }
-        public ExportFunc(string orgName)
-        {
-            OriginalName = orgName;
-            //then parse
-            int pos = orgName.IndexOf("___");
-            if (pos < 0)
-            {
-                //found
-                ProperCsName = orgName;
-            }
-            else
-            {
-                ProperCsName = orgName.Substring(0, pos);
-            }
-        }
-        public override string ToString()
-        {
-            return ProperCsName + " : " + OriginalName;
-        }
-
-        public IntPtr NaitveFuncPtr { get; set; }
-    }
-
     class Program
     {
-        static void Resolve(IntPtr modulePtr, ExportFunc[] exportFuncs)
-        {
-            for (int i = 0; i < exportFuncs.Length; ++i)
-            {
-                ExportFunc exportFunc = exportFuncs[i];
-                exportFunc.NaitveFuncPtr = GetProcAddress(modulePtr, exportFunc.OriginalName);
-            }
-        }
-        static void ResolveFuncs<T>(string csFuncName, Dictionary<string, ExportFunc> exportDic, out T delOutput)
-        {
-            if (exportDic.TryGetValue(csFuncName, out ExportFunc found))
-            {
-                delOutput = (T)(object)Marshal.GetDelegateForFunctionPointer(found.NaitveFuncPtr, typeof(T));
-            }
-            else
-            {
-                delOutput = default(T);
-            }
-        }
-        static void ResolveFuncs<T>(Dictionary<string, ExportFunc> exportDic, out T delOutput)
-        {
-            string csFuncName = typeof(T).Name;
-            if (exportDic.TryGetValue(csFuncName, out ExportFunc found))
-            {
-                delOutput = (T)(object)Marshal.GetDelegateForFunctionPointer(found.NaitveFuncPtr, typeof(T));
-            }
-            else
-            {
-                delOutput = default(T);
-            }
-        }
-        static Dictionary<string, ExportFunc> ConvertToFuncDic(ExportFunc[] exportFuncs)
-        {
-            Dictionary<string, ExportFunc> dic = new Dictionary<string, ExportFunc>();
-            for (int i = 0; i < exportFuncs.Length; ++i)
-            {
-                ExportFunc exportFunc = exportFuncs[i];
-                if (dic.ContainsKey(exportFunc.ProperCsName))
-                {
-                    throw new NotSupportedException();
-                }
-                else
-                {
-                    dic.Add(exportFunc.ProperCsName, exportFunc);
-                }
-            }
-            return dic;
-        }
-
-
-        static string GetMsvcSdkPath()
-        {
-            string msvcPath = @"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC";
-            string[] folders = Directory.GetDirectories(msvcPath);
-
-            foreach (string f in folders)
-            {
-                string msvc_sdk = f + @"\bin\Hostx64\x64";
-                if (File.Exists(msvc_sdk + "\\link.exe"))
-                {
-                    return msvc_sdk;
-                }
-            }
-            return null;
-        }
-
         static string MSBUILD_PATH = "";
-        static void Main2()
+        static void UpdateMsBuildPath()
         {
-
-
             string[] msbuildPathTryList = new string[]
             {
                 @"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
@@ -126,23 +33,159 @@ namespace TestLoadLib
             {
                 System.Diagnostics.Debug.Write("MSBUILD not found!");
             }
-
-            //string msvc_sdk = GetMsvcSdkPath();
-            //string ss = @"D:\projects\ispc-v1.13.0-windows\examples_build\simple\Debug\simple.dll";
-            //IntPtr dllPtr = LoadLibrary(ss);
-            //IntPtr func = GetProcAddress(dllPtr, "ispc::simple");
-
         }
-        static void Main(string[] args)
-        {
-            Main2();
-            //----------
-            //more easier
-            //----------
 
+        static CodeCompilationUnit ParseAutoGenHeader(string content)
+        {
+            //at this version, use a simple parser
+            //very specific to this header
+            List<string> lines = new List<string>();
+            bool startCollecting = false;
+
+            using (StringReader reader = new StringReader(content))
+            {
+                string line = reader.ReadLine();
+                while (line != null)
+                {
+                    if (!startCollecting)
+                    {
+                        if (line.StartsWith("extern \"C\" {"))
+                        {
+                            startCollecting = true;
+                        }
+                    }
+                    else
+                    {
+                        if (!line.StartsWith("#"))
+                        {
+
+                            if (line == "} /* end extern C */")
+                            {
+                                break;
+                            }
+                            lines.Add(line);
+                        }
+                    }
+                    line = reader.ReadLine();
+                }
+            }
+
+            //
+            HeaderParser headerParser = new HeaderParser();
+            headerParser.Parse("virtual_filename", lines);
+            return headerParser.Result;
+        }
+
+
+        static void GenerateCBinder(string ispc_headerFilename, string outputC_filename)
+        {
+            string header_content = File.ReadAllText(ispc_headerFilename);
+
+            CodeCompilationUnit cu = ParseAutoGenHeader(header_content);
+            //from cu=> we generate interface c 
+            CodeStringBuilder sb = new CodeStringBuilder();
+            sb.AppendLine("//AUTOGEN," + DateTime.Now.ToString("s"));
+            sb.AppendLine("#include <stdio.h>");
+            sb.AppendLine("#include <stdlib.h>");
+            sb.AppendLine("//Include the header file that the ispc compiler generates");
+            sb.AppendLine($"#include \"{ Path.GetFileName(ispc_headerFilename) }\"");
+
+            //c_inf.AppendLine("using namespace ispc;");
+            sb.AppendLine("extern \"C\"{");
+
+            foreach (CodeMemberDeclaration mb in cu.GlobalTypeDecl.GetMemberIter())
+            {
+                if (mb is CodeMethodDeclaration met)
+                {
+                    sb.AppendLine("__declspec(dllexport) ");
+                    sb.Append(met.ToString("my_"));
+                    sb.AppendLine("{");
+                    string ret = met.ReturnType.ToString();
+                    if (ret != "void")
+                    {
+                        sb.Append("return ");
+                    }
+                    sb.Append("ispc::" + met.Name + "(");
+
+                    int par_i = 0;
+                    foreach (CodeMethodParameter par in met.Parameters)
+                    {
+                        if (par_i > 0) { sb.Append(","); }
+                        sb.Append(par.ParameterName);
+                        par_i++;
+                    }
+                    sb.AppendLine(");");
+                    sb.AppendLine("}");
+                }
+                else
+                {
+                    throw new NotSupportedException();
+                }
+            }
+
+            sb.AppendLine("}");//close extern
+
+            string file_content = sb.ToString();
+            File.WriteAllText(outputC_filename, file_content);
+        }
+
+        static void GenerateCsBinder(string ispc_headerFilename, string outputCs_filename, string nativeLibName)
+        {
+            string header_content = File.ReadAllText(ispc_headerFilename);
+
+            CodeCompilationUnit cu = ParseAutoGenHeader(header_content);
+            //from cu=> we generate interface c 
+            CodeStringBuilder sb = new CodeStringBuilder();
+            sb.AppendLine("//AUTOGEN," + DateTime.Now.ToString("s"));
+            sb.AppendLine("using System;");
+            sb.AppendLine("using System.Runtime.InteropServices;");
+
+            sb.AppendLine("using int32_t = System.Int32;");
+            sb.AppendLine("namespace " + Path.GetFileNameWithoutExtension(Path.GetFileName(ispc_headerFilename)) + "{");
+            sb.AppendLine("public static unsafe class NativeMethods{");
+
+            foreach (CodeMemberDeclaration mb in cu.GlobalTypeDecl.GetMemberIter())
+            {
+                if (mb is CodeMethodDeclaration met)
+                {
+                    string retType = met.ReturnType.ToString();
+                    sb.AppendLine($"[DllImport(\"{nativeLibName}\",EntryPoint =\"{"my_" + met.Name}\")]");
+                    sb.Append("public static extern ");
+                    sb.Append(retType);
+                    sb.Append(" ");
+                    sb.Append(met.Name);
+                    sb.Append("(");
+
+                    for (int i = 0; i < met.Parameters.Count; ++i)
+                    {
+                        CodeMethodParameter par = met.Parameters[i];
+                        if (i > 0) { sb.Append(","); }
+                        sb.Append(par.ParameterType.ToString());
+                        sb.Append(" ");
+                        sb.Append(par.ParameterName);
+                    }
+
+                    sb.Append(")");
+                    sb.AppendLine(";");
+                }
+                else
+                {
+                    throw new NotSupportedException();
+                }
+            }
+            sb.AppendLine("}");//static class NativeMethods
+            sb.AppendLine("}");//namespace
+
+            string file_content = sb.ToString();
+            File.WriteAllText(outputCs_filename, file_content);
+        }
+
+        static void RebuildLibraryAndAPI()
+        {
+
+            UpdateMsBuildPath();
 
             ProjectConfigKind configKind = ProjectConfigKind.Debug;
-
             SimpleVcxProjGen gen = new SimpleVcxProjGen();
             //set some proprties
             gen.ProjectName = "simple"; //project name and output            
@@ -151,46 +194,76 @@ namespace TestLoadLib
             string tmp_dir = current_dir + "/temp";
             gen.FullProjSrcPath = current_dir;
             gen.FullProjBuildPath = tmp_dir;
-
             string finalProductName = gen.GetFinalProductName(configKind);
 
+            //build ispc                 
+            string ispc = @"D:\projects\ispc-14-dev-windows\bin\ispc.exe";
+
+            if (!Directory.Exists(tmp_dir))
             {
-                //build ispc                 
-                string ispc = @"D:\projects\ispc-14-dev-windows\bin\ispc.exe";
-
-                if (!Directory.Exists(tmp_dir))
-                {
-                    Directory.CreateDirectory(tmp_dir);
-                }
-
-                string ispc_src = "simple.ispc";
-                string ispc_obj = tmp_dir + "/simple_ispc.obj";
-                string ispc_llvm_text = tmp_dir + "/simple_ispc.llvm.txt";
-                string ispc_header = tmp_dir + "/simple_ispc.h";
-
-                //generate header and object file in temp dir
-                var procStartInfo = new System.Diagnostics.ProcessStartInfo(ispc,
-                   $"{ispc_src} -O2 -o {ispc_obj} -h {ispc_header}");
-
-                //$"{ispc_src} --emit-llvm-text -o {ispc_llvm_text} -h {ispc_header}");
-
-                procStartInfo.UseShellExecute = false;
-                System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
-
-                proc.WaitForExit();
-                int exit_code2 = proc.ExitCode;
-                if (exit_code2 != 0)
-                {
-                    throw new NotSupportedException();
-                }
-
-                //at this step we have object file and header
-                //build a cpp dll with msbuild  
-                gen.AddObjectFile(ispc_obj);
-                gen.AddIncludeFile(ispc_header);
-                //add our c-interface
-                gen.AddCompileFile(gen.FullProjSrcPath + "/simple/simple.cpp");//interface
+                Directory.CreateDirectory(tmp_dir);
             }
+
+            string ispc_src = "simple.ispc";
+            string ispc_obj = tmp_dir + "/simple_ispc.obj";
+            string ispc_llvm_text = tmp_dir + "/simple_ispc.llvm.txt";
+            string ispc_cpp = tmp_dir + "/simple_ispc.cpp";
+            string ispc_header = tmp_dir + "/simple_ispc.h";
+
+            //generate header and object file in temp dir
+            var procStartInfo = new System.Diagnostics.ProcessStartInfo(ispc,
+             $"{ispc_src} -O2 -o {ispc_obj} -h {ispc_header}");
+
+            //$"{ispc_src} --emit-c++ -o {ispc_cpp}");
+            //$"{ispc_src} --emit-llvm-text -o {ispc_llvm_text} -h {ispc_header}");
+
+            procStartInfo.UseShellExecute = false;
+            procStartInfo.RedirectStandardOutput = true;
+            procStartInfo.RedirectStandardError = true;
+            System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
+
+            var errReader = proc.StandardError;
+            {
+                string line = errReader.ReadLine();
+
+                while (line != null)
+                {
+                    line = errReader.ReadLine();
+                }
+            }
+            var outputStrmReader = proc.StandardOutput;
+            {
+                string line = outputStrmReader.ReadLine();
+                while (line != null)
+                {
+                    line = outputStrmReader.ReadLine();
+                }
+            }
+
+            proc.WaitForExit();
+            int exit_code2 = proc.ExitCode;
+            if (exit_code2 != 0)
+            {
+                throw new NotSupportedException();
+            }
+            //----------
+            //now read auto-gen header
+
+            string c_interface_filename = gen.FullProjSrcPath + "/simple/simple.cpp";
+            GenerateCBinder(ispc_header, c_interface_filename);
+
+            string cs_method_invoke_filename = "simple.cs";
+            GenerateCsBinder(ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
+            //move cs code to src folder
+
+
+            //
+            //at this step we have object file and header
+            //build a cpp dll with msbuild  
+            gen.AddObjectFile(ispc_obj);
+            gen.AddIncludeFile(ispc_header);
+            //add our c-interface
+            gen.AddCompileFile(c_interface_filename);
 
             VcxProject project = gen.CreateVcxTemplate();
 
@@ -214,8 +287,6 @@ namespace TestLoadLib
                     break;
             }
 
-
-
             System.Diagnostics.Process proc1 = System.Diagnostics.Process.Start(MSBUILD_PATH, vxs_projOutputFilename + p_config);
             proc1.WaitForExit();
             int exit_code1 = proc1.ExitCode;
@@ -224,36 +295,51 @@ namespace TestLoadLib
                 throw new NotSupportedException();
             }
 
-            //build pass, then copy the result dll back             
-            IntPtr dllPtr = LoadLibrary(finalProductName);
+            //build pass, then copy the result dll back     
+
+            File.Move(finalProductName, Path.GetFileName(finalProductName));
+        }
+        static void Main(string[] args)
+        {
+
+            //----------
+            //more easier
+            //----------
+
+            string dllName = "simple.dll";
+
+
+            //TODO: check if we need to rebuild or not
+            bool rebuild = true;
+            if (rebuild)
+            {
+                RebuildLibraryAndAPI();
+            }
+
+            IntPtr dllPtr = LoadLibrary(dllName);
 
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
 
-            IntPtr funct = GetProcAddress(dllPtr, "my_simple");
+            IntPtr funct = GetProcAddress(dllPtr, "my_simple"); //test
             if (funct == IntPtr.Zero) { throw new NotSupportedException(); }
 
-            //---------
-            ////convert arr to dic, then we will resolve it
-            //Dictionary<string, ExportFunc> funcDic = ConvertToFuncDic(exportFuncs);
 
-            //ResolveFuncs(funcDic, out swap_rb swap_rb_);
-            //ResolveFuncs(funcDic, out flipY_and_swap flipY_and_swap_);
-            //ResolveFuncs(funcDic, out clear clear_);
+            //test1
+            int[] inputData = new int[]
+            {
+                1<<16,  2<<16, 3<<16,  4<<16,
+                5<<16,  6<<16, 7<<16,  8<<16,
+                9<<16, 10<<16, 11<<16,  12<<16,
+            };
+            unsafe
+            {
+                fixed (int* h = &inputData[0])
+                {
+                    simple_ispc.NativeMethods.clear(h, 0, inputData.Length);
+                }
+            }
 
-            //int[] inputData = new int[]
-            //{
-            //    1<<16,  2<<16, 3<<16,  4<<16,
-            //    5<<16,  6<<16, 7<<16,  8<<16,
-            //    9<<16, 10<<16, 11<<16,  12<<16,
-            //};
-            //unsafe
-            //{
-            //    fixed (int* h = &inputData[0])
-            //    {
-            //        clear_((IntPtr)h, 0, inputData.Length);
-            //    }
-            //}
-
+            //test2
             //int[] outputData = new int[inputData.Length];
             //unsafe
             //{
@@ -264,81 +350,7 @@ namespace TestLoadLib
             //    }
             //}
         }
-        void OldCode()
-        {
-            //test build dll from obj file 
-            string msvc_sdk = GetMsvcSdkPath();
 
-            if (msvc_sdk == null)
-            {
-                throw new NotSupportedException();
-            }
-
-            //---------             
-            {
-                var procStartInfo = new System.Diagnostics.ProcessStartInfo(msvc_sdk + "\\link.exe", "/DLL /out:simple.dll /NOENTRY *.obj");
-                procStartInfo.UseShellExecute = false;
-                System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
-                proc.WaitForExit();
-
-                int exit_code = proc.ExitCode;
-            }
-            //---------
-            ExportFunc[] exportFuncs = null;
-            {
-                //dump all functions from lib
-                var procStartInfo = new System.Diagnostics.ProcessStartInfo(msvc_sdk + "\\dumpbin.exe",
-                   "/EXPORTS simple.dll");
-                procStartInfo.RedirectStandardOutput = true;
-                procStartInfo.UseShellExecute = false;
-                System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
-                StreamReader r = proc.StandardOutput;
-                List<string> lines = new List<string>();
-                string line = r.ReadLine();
-                while (line != null)
-                {
-                    lines.Add(line);
-                    line = r.ReadLine();
-                }
-                proc.WaitForExit();
-                DumpBinResultParser parser = new DumpBinResultParser();
-                parser.Parse(lines);
-
-                string[] results = parser.GetAllExportFuncNames();
-
-                exportFuncs = new ExportFunc[results.Length];
-                //then parse output
-                if (results != null)
-                {
-                    //convert func 
-                    //to more proper form
-                    for (int i = 0; i < results.Length; ++i)
-                    {
-                        exportFuncs[i] = new ExportFunc(results[i]);
-                    }
-                }
-            }
-
-            //Resolve(dllPtr, exportFuncs); 
-            //convert arr to dic, then we will resolve it
-            Dictionary<string, ExportFunc> funcDic = ConvertToFuncDic(exportFuncs);
-
-            ResolveFuncs(funcDic, out swap_rb swap_rb_);
-            ResolveFuncs(funcDic, out flipY_and_swap flipY_and_swap_);
-            ResolveFuncs(funcDic, out clear clear_);
-        }
-        //need delegate name preserved
-        //export void swap_rb(uniform int v_in[], uniform int count){
-        delegate void swap_rb(IntPtr inputArr, int len);
-
-        //export void flipY_and_swap(uniform int v_in[],
-        //                   uniform int v_out[],
-        //                   uniform int width,
-        //                   uniform int height){
-        delegate void flipY_and_swap(IntPtr inputArr, IntPtr outputArr, int width, int height);
-
-        //export void clear(uniform int v_in[],uniform int newValue,uniform int count)
-        delegate void clear(IntPtr inputArr, int newValue, int count);
 
         [DllImport("Kernel32.dll")]
         static extern IntPtr LoadLibrary(string libraryName);
@@ -346,6 +358,7 @@ namespace TestLoadLib
         static extern bool FreeLibrary(IntPtr hModule);
         [DllImport("Kernel32.dll")]
         static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-        //-------------------------------------
+
+
     }
 }
