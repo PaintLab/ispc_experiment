@@ -165,11 +165,14 @@ namespace TestLoadLib
 
                 string ispc_src = "simple.ispc";
                 string ispc_obj = tmp_dir + "/simple_ispc.obj";
+                string ispc_llvm_text = tmp_dir + "/simple_ispc.llvm.txt";
                 string ispc_header = tmp_dir + "/simple_ispc.h";
 
                 //generate header and object file in temp dir
                 var procStartInfo = new System.Diagnostics.ProcessStartInfo(ispc,
                    $"{ispc_src} -O2 -o {ispc_obj} -h {ispc_header}");
+
+                //$"{ispc_src} --emit-llvm-text -o {ispc_llvm_text} -h {ispc_header}");
 
                 procStartInfo.UseShellExecute = false;
                 System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
