@@ -7,9 +7,9 @@ see more about ISPC at https://ispc.github.io/ispc.html
 
 Concept:
  
-This C# tool chain will 
+This C# tool chain will ... ( [see the code](https://github.com/PaintLab/ispc_experiment/blob/master/BridgeBuilder/6_Ispc/IspcBuilder.cs) )
  
-
+ 
 1. this C# toolchain will send **input** .ispc code to  _ispc.exe_ => **output** c-header and object file
 
 2. then the toolchain will read **input** c-header (and parse it)=> **output** c-code binding ("extern C {" code for a new native dll)
