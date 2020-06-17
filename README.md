@@ -16,9 +16,9 @@ This C# tool chain will ... ( [see the code](https://github.com/PaintLab/ispc_ex
    
      AND C# extern code ([DllImport]) for binding with the new dll.   
 
-3. then toolchain reads **input** c-header and autogen code => **output** create .vcxproj project on the fly.
+3. then toolchain gathers **input** c-header and autogen c code  and create => **output** .vcxproj project on the fly.
 
-4. the toolchain sends **input** .vcxproj  project => **output** native dll 
+4. the toolchain sends **input** .vcxproj  project to MSBuild.exe => **output** native dll 
 
 5. the rest is loading that dll, and the C# code will access native func dll from extern code that are generated on step 2
 
