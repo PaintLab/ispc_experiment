@@ -1,7 +1,6 @@
 ﻿//MIT, 2020, WinterDev
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 
 using BridgeBuilder.Vcx;
@@ -26,7 +25,7 @@ namespace BridgeBuilder.Ispc
 
         public string[] AdditionalInputItems { get; set; }
 
-   
+
         public void RebuildLibraryAndAPI()
         {
 
