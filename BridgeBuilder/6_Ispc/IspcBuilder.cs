@@ -1,7 +1,7 @@
 ﻿//MIT, 2020, WinterDev
 using System;
 using System.Collections.Generic;
-
+using System.Globalization;
 using System.IO;
 
 using BridgeBuilder.Vcx;
@@ -23,6 +23,8 @@ namespace BridgeBuilder.Ispc
         public string IspcFilename { get; set; }
         public string IspcBridgeFunctionNamePrefix { get; set; } = "my_";
         public string AutoCsTargetFile { get; set; }
+
+        public string[] AdditionalInputItems { get; set; }
 
         public void RebuildLibraryAndAPI()
         {
@@ -106,13 +108,13 @@ namespace BridgeBuilder.Ispc
             string cs_method_invoke_filename = onlyProjectName + ".cs"; //save to
             GenerateCsBinder(ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
             //move cs code to src folder
-             
-           
+
+
             if (AutoCsTargetFile != null)
             {
                 MoveFileOrReplaceIfExists(cs_method_invoke_filename, AutoCsTargetFile);
             }
-            
+
             //
             //at this step we have object file and header
             //build a cpp dll with msbuild  
@@ -120,6 +122,31 @@ namespace BridgeBuilder.Ispc
             gen.AddIncludeFile(ispc_header);
             //add our c-interface
             gen.AddCompileFile(c_interface_filename);
+
+            if (AdditionalInputItems != null)
+            {
+                foreach (string s in AdditionalInputItems)
+                {
+                 
+
+                    switch (Path.GetExtension(s))
+                    {
+                        default: throw new NotSupportedException();
+                        case ".c":
+                        case ".cpp":
+                            gen.AddCompileFile(s);
+                            break;
+                        case ".h":
+                        case ".hpp":
+                            gen.AddIncludeFile(s);
+                            break;
+                        case ".obj":
+                            gen.AddObjectFile(s);
+                            break;
+                    }
+                }
+            }
+
 
             VcxProject project = gen.CreateVcxTemplate();
 

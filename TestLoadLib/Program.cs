@@ -18,9 +18,16 @@ namespace TestLoadLib
             //----------
             //more easier
             //----------
+            //Ispc_SimpleExample();
+            Ispc_SortExample();
 
+        }
+
+
+        static void Ispc_SimpleExample()
+        {
+            //from: ispc-14-dev-windows\examples\simple
             string dllName = "simple.dll";
-
 
             //TODO: check if we need to rebuild or not
             bool rebuild = true;
@@ -67,10 +74,58 @@ namespace TestLoadLib
                     simple_ispc.NativeMethods.clear(h, 0, inputData.Length);
                 }
             }
-
-
         }
 
+        static void Ispc_SortExample()
+        {
+            //from: ispc-14-dev-windows\examples\sort
+
+            string dllName = "sort.dll";
+            //TODO: check if we need to rebuild or not
+            bool rebuild = true;
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = "sort.ispc";
+                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\sort.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+
+            }
+
+            IntPtr dllPtr = LoadLibrary(dllName);
+
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+
+            int m_round = 20;
+            int elem_count = 10000;
+            Random rand = new Random(20);
+            uint[] code = new uint[elem_count];
+            for (int round = 0; round < m_round; round++)
+            {
+                for (int i = 0; i < elem_count; i++)
+                {
+                    code[i] = (uint)rand.Next(0, elem_count);
+                }
+                unsafe
+                {
+                    int[] ordered_output = new int[elem_count];
+                    fixed (uint* code_ptr = &code[0])
+                    fixed (int* ordered_output_ptr = &ordered_output[0])
+                    {
+                        sort_ispc.NativeMethods.sort_ispc(elem_count, code_ptr, ordered_output_ptr, 0);
+                    }
+                }
+            }
+
+        }
 
         [DllImport("Kernel32.dll")]
         static extern IntPtr LoadLibrary(string libraryName);
