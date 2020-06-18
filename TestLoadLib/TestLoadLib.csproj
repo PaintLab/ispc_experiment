@@ -42,6 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AutoGenBinders\mandelbrot.cs" />
+    <Compile Include="AutoGenBinders\mandelbrot_task.cs" />
     <Compile Include="AutoGenBinders\simple.cs" />
     <Compile Include="AutoGenBinders\sort.cs" />
     <Compile Include="Program.cs" />
@@ -50,6 +51,9 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="mandelbrot.ispc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="mandelbrot_task.ispc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="simple.ispc">

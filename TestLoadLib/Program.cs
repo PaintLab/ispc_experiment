@@ -6,7 +6,6 @@ using System.IO;
 
 using BridgeBuilder;
 using BridgeBuilder.Ispc;
-using System.Runtime.CompilerServices;
 
 namespace TestLoadLib
 {
@@ -21,7 +20,8 @@ namespace TestLoadLib
             //----------
             //Ispc_SimpleExample();
             //Ispc_SortExample();
-            Ispc_MandelbrotExample();
+            //Ispc_MandelbrotExample();
+            Ispc_MandlebrotTaskExample();
         }
 
 
@@ -170,8 +170,58 @@ namespace TestLoadLib
                     mandelbrot_ispc.NativeMethods.mandelbrot_ispc(x0, y0, x1, y1, width, height, maxIterations, output_h);
                 }
             }
-            //convert to grayscale image
+            SaveManelbrotImage(buffer, width, height, "test_mandelbrot.png");
+        }
 
+        static void Ispc_MandlebrotTaskExample()
+        {
+            //from: ispc-14-dev-windows\examples\mandelbrot
+            string dllName = "mandelbrot_task.dll";
+            //TODO: check if we need to rebuild or not
+            bool rebuild = true;
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = "mandelbrot_task.ispc";
+                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\mandelbrot_task.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            IntPtr dllPtr = LoadLibrary(dllName);
+
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            int width = 768;
+            int height = 512;
+            //
+            float x0 = -2;
+            float x1 = 1;
+            float y0 = -1;
+            float y1 = 1;
+
+            int maxIterations = 256;
+            int[] buffer = new int[width * height];
+            unsafe
+            {
+                fixed (int* output_h = &buffer[0])
+                {
+                    mandelbrot_task_ispc.NativeMethods.mandelbrot_ispc(x0, y0, x1, y1, width, height, maxIterations, output_h);
+                }
+            }
+            SaveManelbrotImage(buffer, width, height, "test_mandelbrot_task.png");
+        }
+
+
+        static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
+        {
+            //convert to grayscale image
             using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             {
                 System.Drawing.Imaging.BitmapData bmpdata = bmp.LockBits(new System.Drawing.Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadWrite, bmp.PixelFormat);
@@ -196,9 +246,10 @@ namespace TestLoadLib
                 }
 
                 bmp.UnlockBits(bmpdata);
-                bmp.Save("test_mandelbrot.png");
+                bmp.Save(filename);
             }
         }
+
 
 
         [DllImport("Kernel32.dll")]
