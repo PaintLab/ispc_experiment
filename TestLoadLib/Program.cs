@@ -18,12 +18,23 @@ namespace TestLoadLib
             //----------
             //more easier
             //----------
-            //Ispc_SimpleExample();
+            Ispc_SimpleExample();
             //Ispc_SortExample();
             //Ispc_MandelbrotExample();
-            Ispc_MandlebrotTaskExample();
+            //Ispc_MandlebrotTaskExample();
+#if DEBUG
+           // dbugParseHeader(@"D:\projects\ispc-14-dev-windows\examples_build\deferred\kernels_ispc.h");
+#endif
         }
+#if DEBUG
 
+        static void dbugParseHeader(string filename)
+        {
+            IspcBuilder builder = new IspcBuilder();
+            builder.ParseAutoGenHeaderFromFile(filename);
+
+        }
+#endif
 
         static void Ispc_SimpleExample()
         {
@@ -218,6 +229,7 @@ namespace TestLoadLib
 
             SaveManelbrotImage(buffer, width, height, "test_mandelbrot_task.png");
         }
+
 
 
         static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)

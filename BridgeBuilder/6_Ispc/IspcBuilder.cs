@@ -243,31 +243,22 @@ namespace BridgeBuilder.Ispc
             //at this version, use a simple parser
             //very specific to this header
             List<string> lines = new List<string>();
-            bool startCollecting = false;
+            bool startCollecting = true;
 
             using (StringReader reader = new StringReader(content))
             {
                 string line = reader.ReadLine();
                 while (line != null)
                 {
-                    if (!startCollecting)
+                    if (!line.StartsWith("#") && !line.StartsWith("//"))
                     {
-                        if (line.StartsWith("extern \"C\" {"))
-                        {
-                            startCollecting = true;
-                        }
+                        lines.Add(line);
                     }
                     else
                     {
-                        if (!line.StartsWith("#"))
-                        {
-
-                            if (line == "} /* end extern C */")
-                            {
-                                break;
-                            }
-                            lines.Add(line);
-                        }
+                        //temp fix
+                        //insert blank line,just want to preserve line number                         
+                        lines.Add("");
                     }
                     line = reader.ReadLine();
                 }
@@ -307,30 +298,48 @@ namespace BridgeBuilder.Ispc
 
             foreach (CodeMemberDeclaration mb in cu.GlobalTypeDecl.GetMemberIter())
             {
-                if (mb is CodeMethodDeclaration met)
+                if (mb is CodeTypeDeclaration namespaceDecl &&
+                    namespaceDecl.Kind == TypeKind.Namespace)
                 {
+                    //ispc output 
 
-                    sb.AppendLine("__declspec(dllexport) "); //WINDOWS
-
-                    sb.Append(met.ToString(IspcBridgeFunctionNamePrefix));
-
-                    sb.AppendLine("{");
-                    string ret = met.ReturnType.ToString();
-                    if (ret != "void")
+                    //iterate member inside the current namespace
+                    foreach (CodeMemberDeclaration nsMember in namespaceDecl.GetMemberIter())
                     {
-                        sb.Append("return ");
-                    }
-                    sb.Append("ispc::" + met.Name + "(");
+                        if (nsMember is CodeMethodDeclaration met)
+                        {
+                            sb.AppendLine("__declspec(dllexport) "); //WINDOWS
 
-                    int par_i = 0;
-                    foreach (CodeMethodParameter par in met.Parameters)
-                    {
-                        if (par_i > 0) { sb.Append(","); }
-                        sb.Append(par.ParameterName);
-                        par_i++;
+                            sb.Append(met.ToString(IspcBridgeFunctionNamePrefix));
+
+                            sb.AppendLine("{");
+                            string ret = met.ReturnType.ToString();
+                            if (ret != "void")
+                            {
+                                sb.Append("return ");
+                            }
+                            sb.Append("ispc::" + met.Name + "(");
+
+                            int par_i = 0;
+                            foreach (CodeMethodParameter par in met.Parameters)
+                            {
+                                if (par_i > 0) { sb.Append(","); }
+                                sb.Append(par.ParameterName);
+                                par_i++;
+                            }
+                            sb.AppendLine(");");
+                            sb.AppendLine("}");
+                        }
+                        else if (nsMember is CodeTypeDeclaration other)
+                        {
+                            //
+
+                        }
+                        else
+                        {
+                            throw new NotSupportedException();
+                        }
                     }
-                    sb.AppendLine(");");
-                    sb.AppendLine("}");
                 }
                 else
                 {
@@ -375,27 +384,42 @@ namespace BridgeBuilder.Ispc
 
             foreach (CodeMemberDeclaration mb in cu.GlobalTypeDecl.GetMemberIter())
             {
-                if (mb is CodeMethodDeclaration met)
+                if (mb is CodeTypeDeclaration ns && ns.Kind == TypeKind.Namespace)
                 {
-                    string retType = met.ReturnType.ToString();
-                    sb.AppendLine($"[DllImport(LIB_NAME,EntryPoint =\"{IspcBridgeFunctionNamePrefix + met.Name}\")]");
-                    sb.Append("public static extern ");
-                    sb.Append(retType);
-                    sb.Append(" ");
-                    sb.Append(met.Name);
-                    sb.Append("(");
-
-                    for (int i = 0; i < met.Parameters.Count; ++i)
+                    foreach (CodeMemberDeclaration ns_mb in ns.GetMemberIter())
                     {
-                        CodeMethodParameter par = met.Parameters[i];
-                        if (i > 0) { sb.Append(","); }
-                        sb.Append(par.ParameterType.ToString());
-                        sb.Append(" ");
-                        sb.Append(par.ParameterName);
+                        if (ns_mb is CodeMethodDeclaration met)
+                        {
+                            string retType = met.ReturnType.ToString();
+                            sb.AppendLine($"[DllImport(LIB_NAME,EntryPoint =\"{IspcBridgeFunctionNamePrefix + met.Name}\")]");
+                            sb.Append("public static extern ");
+                            sb.Append(retType);
+                            sb.Append(" ");
+                            sb.Append(met.Name);
+                            sb.Append("(");
+
+                            for (int i = 0; i < met.Parameters.Count; ++i)
+                            {
+                                CodeMethodParameter par = met.Parameters[i];
+                                if (i > 0) { sb.Append(","); }
+                                sb.Append(par.ParameterType.ToString());
+                                sb.Append(" ");
+                                sb.Append(par.ParameterName);
+                            }
+                            sb.Append(")");
+                            sb.AppendLine(";");
+
+                        }
+                        else if (ns_mb is CodeTypeDeclaration typedecl)
+                        {
+
+                        }
+                        else
+                        {
+                            throw new NotSupportedException();
+                        }
                     }
 
-                    sb.Append(")");
-                    sb.AppendLine(";");
                 }
                 else
                 {
