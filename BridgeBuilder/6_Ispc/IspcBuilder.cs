@@ -26,6 +26,7 @@ namespace BridgeBuilder.Ispc
 
         public string[] AdditionalInputItems { get; set; }
 
+   
         public void RebuildLibraryAndAPI()
         {
 
@@ -127,7 +128,7 @@ namespace BridgeBuilder.Ispc
             {
                 foreach (string s in AdditionalInputItems)
                 {
-                 
+
 
                     switch (Path.GetExtension(s))
                     {

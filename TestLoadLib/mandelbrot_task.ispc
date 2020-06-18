@@ -80,7 +80,7 @@ mandelbrot_scanline(uniform float x0, uniform float dx,
 #endif
         float x = x0 + xi * dx;
         float y = y0 + yi * dy;
-
+         
         int index = yi * width + xi;
         output[index] = mandel(x, y, maxIterations);
     }

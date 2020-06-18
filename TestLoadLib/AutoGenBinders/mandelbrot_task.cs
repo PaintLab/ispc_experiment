@@ -1,4 +1,4 @@
-/*x14*///AUTOGEN,2020-06-18T18:13:38
+/*x14*///AUTOGEN,2020-06-18T18:21:55
 /*x15*///Tools: ispc and BridgeBuilder
 /*x16*///Src: D:\projects\ispc_experiment\TestLoadLib\bin\Debug/temp/mandelbrot_task_ispc.h
 /*x17*/

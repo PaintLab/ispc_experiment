@@ -31,7 +31,7 @@ namespace TestLoadLib
             string dllName = "simple.dll";
 
             //TODO: check if we need to rebuild or not
-            bool rebuild = true;
+            bool rebuild = NeedRebuild("simple");
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -83,7 +83,7 @@ namespace TestLoadLib
 
             string dllName = "sort.dll";
             //TODO: check if we need to rebuild or not
-            bool rebuild = true;
+            bool rebuild = NeedRebuild("sort");
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -133,7 +133,7 @@ namespace TestLoadLib
             //from: ispc-14-dev-windows\examples\mandelbrot
             string dllName = "mandelbrot.dll";
             //TODO: check if we need to rebuild or not
-            bool rebuild = false;
+            bool rebuild = NeedRebuild("mandelbrot");
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -178,7 +178,7 @@ namespace TestLoadLib
             //from: ispc-14-dev-windows\examples\mandelbrot
             string dllName = "mandelbrot_task.dll";
             //TODO: check if we need to rebuild or not
-            bool rebuild = true;
+            bool rebuild = NeedRebuild("mandelbrot_task");
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -215,6 +215,7 @@ namespace TestLoadLib
                     mandelbrot_task_ispc.NativeMethods.mandelbrot_ispc(x0, y0, x1, y1, width, height, maxIterations, output_h);
                 }
             }
+
             SaveManelbrotImage(buffer, width, height, "test_mandelbrot_task.png");
         }
 
@@ -249,8 +250,22 @@ namespace TestLoadLib
                 bmp.Save(filename);
             }
         }
+        static bool NeedRebuild(string ispc_module_name)
+        {
+            //ASSUME!
+            return NeedRebuild(ispc_module_name + ".ispc", ispc_module_name + ".dll");
+        }
+        static bool NeedRebuild(string ispc_src, string dllLib)
+        {
+            if (File.Exists(dllLib))
+            {
+                DateTime dllWriteTime = File.GetLastWriteTime(dllLib);
+                DateTime ispcSrcWriteTime = File.GetLastWriteTime(ispc_src);
+                return ispcSrcWriteTime > dllWriteTime;
+            }
+            return true;
 
-
+        }
 
         [DllImport("Kernel32.dll")]
         static extern IntPtr LoadLibrary(string libraryName);
