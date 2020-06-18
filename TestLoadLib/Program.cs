@@ -18,12 +18,20 @@ namespace TestLoadLib
             //----------
             //more easier
             //----------
+            //Ispc_SimpleExample();
+            //Ispc_SortExample();
+            //Ispc_MandelbrotExample();
+            Ispc_MandlebrotTaskExample();
+        }
 
+
+        static void Ispc_SimpleExample()
+        {
+            //from: ispc-14-dev-windows\examples\simple
             string dllName = "simple.dll";
 
-
             //TODO: check if we need to rebuild or not
-            bool rebuild = true;
+            bool rebuild = NeedRebuild("simple");
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -67,10 +75,197 @@ namespace TestLoadLib
                     simple_ispc.NativeMethods.clear(h, 0, inputData.Length);
                 }
             }
+        }
 
+        static void Ispc_SortExample()
+        {
+            //from: ispc-14-dev-windows\examples\sort
+
+            string dllName = "sort.dll";
+            //TODO: check if we need to rebuild or not
+            bool rebuild = NeedRebuild("sort");
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = "sort.ispc";
+                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\sort.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+
+            }
+
+            IntPtr dllPtr = LoadLibrary(dllName);
+
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+
+            int m_round = 20;
+            int elem_count = 10000;
+            Random rand = new Random(20);
+            uint[] code = new uint[elem_count];
+            for (int round = 0; round < m_round; round++)
+            {
+                for (int i = 0; i < elem_count; i++)
+                {
+                    code[i] = (uint)rand.Next(0, elem_count);
+                }
+                unsafe
+                {
+                    int[] ordered_output = new int[elem_count];
+                    fixed (uint* code_ptr = &code[0])
+                    fixed (int* ordered_output_ptr = &ordered_output[0])
+                    {
+                        sort_ispc.NativeMethods.sort_ispc(elem_count, code_ptr, ordered_output_ptr, 0);
+                    }
+                }
+            }
 
         }
 
+        static void Ispc_MandelbrotExample()
+        {
+            //from: ispc-14-dev-windows\examples\mandelbrot
+            string dllName = "mandelbrot.dll";
+            //TODO: check if we need to rebuild or not
+            bool rebuild = NeedRebuild("mandelbrot");
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = "mandelbrot.ispc";
+                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\mandelbrot.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            IntPtr dllPtr = LoadLibrary(dllName);
+
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            int width = 768;
+            int height = 512;
+            //
+            float x0 = -2;
+            float x1 = 1;
+            float y0 = -1;
+            float y1 = 1;
+
+            int maxIterations = 256;
+            int[] buffer = new int[width * height];
+            unsafe
+            {
+                fixed (int* output_h = &buffer[0])
+                {
+                    mandelbrot_ispc.NativeMethods.mandelbrot_ispc(x0, y0, x1, y1, width, height, maxIterations, output_h);
+                }
+            }
+            SaveManelbrotImage(buffer, width, height, "test_mandelbrot.png");
+        }
+
+        static void Ispc_MandlebrotTaskExample()
+        {
+            //from: ispc-14-dev-windows\examples\mandelbrot
+            string dllName = "mandelbrot_task.dll";
+            //TODO: check if we need to rebuild or not
+            bool rebuild = NeedRebuild("mandelbrot_task");
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = "mandelbrot_task.ispc";
+                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\mandelbrot_task.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            IntPtr dllPtr = LoadLibrary(dllName);
+
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            int width = 768;
+            int height = 512;
+            //
+            float x0 = -2;
+            float x1 = 1;
+            float y0 = -1;
+            float y1 = 1;
+
+            int maxIterations = 256;
+            int[] buffer = new int[width * height];
+            unsafe
+            {
+                fixed (int* output_h = &buffer[0])
+                {
+                    mandelbrot_task_ispc.NativeMethods.mandelbrot_ispc(x0, y0, x1, y1, width, height, maxIterations, output_h);
+                }
+            }
+
+            SaveManelbrotImage(buffer, width, height, "test_mandelbrot_task.png");
+        }
+
+
+        static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
+        {
+            //convert to grayscale image
+            using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                System.Drawing.Imaging.BitmapData bmpdata = bmp.LockBits(new System.Drawing.Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadWrite, bmp.PixelFormat);
+
+                IntPtr scan0 = bmpdata.Scan0;
+                unsafe
+                {
+                    int* output_ptr = (int*)scan0;
+                    int index = 0;
+                    for (int y = 0; y < height; ++y)
+                    {
+                        for (int x = 0; x < width; ++x)
+                        {
+                            int data = buffer[index];
+                            byte output = ((data & 0x1) != 0) ? (byte)240 : (byte)20;
+                            *output_ptr = (255 << 24) | (output << 16) | (output << 8) | (output << 0);
+
+                            output_ptr++;
+                            index++;
+                        }
+                    }
+                }
+
+                bmp.UnlockBits(bmpdata);
+                bmp.Save(filename);
+            }
+        }
+        static bool NeedRebuild(string ispc_module_name)
+        {
+            //ASSUME!
+            return NeedRebuild(ispc_module_name + ".ispc", ispc_module_name + ".dll");
+        }
+        static bool NeedRebuild(string ispc_src, string dllLib)
+        {
+            if (File.Exists(dllLib))
+            {
+                DateTime dllWriteTime = File.GetLastWriteTime(dllLib);
+                DateTime ispcSrcWriteTime = File.GetLastWriteTime(ispc_src);
+                return ispcSrcWriteTime > dllWriteTime;
+            }
+            return true;
+
+        }
 
         [DllImport("Kernel32.dll")]
         static extern IntPtr LoadLibrary(string libraryName);

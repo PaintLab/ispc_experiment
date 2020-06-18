@@ -87,7 +87,7 @@ namespace BridgeBuilder
                                 else if (c == '"')
                                 {
                                     //string literal
-                                    LexStrignLiteral(charBuffer, j, ref i);
+                                    LexStringLiteral(charBuffer, j, ref i);
                                 }
                                 else
                                 {
@@ -178,7 +178,7 @@ namespace BridgeBuilder
                             else if (c == '"')
                             {
                                 //string literal
-                                LexStrignLiteral(charBuffer, j, ref i);
+                                LexStringLiteral(charBuffer, j, ref i);
                             }
                             else
                             {
@@ -503,7 +503,7 @@ namespace BridgeBuilder
                 });
             }
         }
-        void LexStrignLiteral(char[] charBuffer, int charCount, ref int currentIndex)
+        void LexStringLiteral(char[] charBuffer, int charCount, ref int currentIndex)
         {
             StringBuilder stbuilder = new StringBuilder();
             char c = charBuffer[currentIndex];
