@@ -103,15 +103,15 @@ namespace BridgeBuilder.Ispc
             //now read auto-gen header
 
             string c_interface_filename = gen.FullProjSrcPath + "/" + onlyProjectName + ".cpp";
-            
+
             CodeCompilationUnit cu = ParseAutoGenHeaderFromFile(ispc_header);
 
             GenerateCBinder(cu, ispc_header, c_interface_filename);
 
             string cs_method_invoke_filename = onlyProjectName + ".cs"; //save to
-            
+
             GenerateCsBinder(cu, ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
-            
+
             //move cs code to src folder
 
 
@@ -278,7 +278,8 @@ namespace BridgeBuilder.Ispc
             headerParser.Parse("virtual_filename", lines);
             return headerParser.Result;
         }
-        static CodeCompilationUnit ParseAutoGenHeaderFromFile(string filename)
+
+        public CodeCompilationUnit ParseAutoGenHeaderFromFile(string filename)
         {
             return ParseAutoGenHeader(File.ReadAllText(filename));
         }
