@@ -331,7 +331,12 @@ namespace BridgeBuilder.Ispc
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Runtime.InteropServices;");
 
+            sb.AppendLine();
             sb.AppendLine("using int32_t = System.Int32;");
+            sb.AppendLine("using uint32_t = System.UInt32;");
+            sb.AppendLine();
+
+            //
             sb.AppendLine("namespace " + Path.GetFileNameWithoutExtension(Path.GetFileName(ispc_headerFilename)) + "{");
             sb.AppendLine("public static unsafe class NativeMethods{");
             sb.AppendLine($"const string LIB_NAME=\"{nativeLibName}\";");
