@@ -103,10 +103,15 @@ namespace BridgeBuilder.Ispc
             //now read auto-gen header
 
             string c_interface_filename = gen.FullProjSrcPath + "/" + onlyProjectName + ".cpp";
-            GenerateCBinder(ispc_header, c_interface_filename);
+            
+            CodeCompilationUnit cu = ParseAutoGenHeaderFromFile(ispc_header);
+
+            GenerateCBinder(cu, ispc_header, c_interface_filename);
 
             string cs_method_invoke_filename = onlyProjectName + ".cs"; //save to
-            GenerateCsBinder(ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
+            
+            GenerateCsBinder(cu, ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
+            
             //move cs code to src folder
 
 
@@ -273,17 +278,18 @@ namespace BridgeBuilder.Ispc
             headerParser.Parse("virtual_filename", lines);
             return headerParser.Result;
         }
-
+        static CodeCompilationUnit ParseAutoGenHeaderFromFile(string filename)
+        {
+            return ParseAutoGenHeader(File.ReadAllText(filename));
+        }
         /// <summary>
         /// generate C binder
         /// </summary>
         /// <param name="ispc_headerFilename"></param>
         /// <param name="outputC_filename"></param>
-        void GenerateCBinder(string ispc_headerFilename, string outputC_filename)
+        void GenerateCBinder(CodeCompilationUnit cu, string ispc_headerFilename, string outputC_filename)
         {
-            string header_content = File.ReadAllText(ispc_headerFilename);
 
-            CodeCompilationUnit cu = ParseAutoGenHeader(header_content);
             //from cu=> we generate interface c 
             CodeStringBuilder sb = new CodeStringBuilder();
             sb.AppendLine("//AUTOGEN," + DateTime.Now.ToString("s"));
@@ -343,11 +349,9 @@ namespace BridgeBuilder.Ispc
         /// <param name="ispc_headerFilename"></param>
         /// <param name="outputCs_filename"></param>
         /// <param name="nativeLibName"></param>
-        void GenerateCsBinder(string ispc_headerFilename, string outputCs_filename, string nativeLibName)
+        void GenerateCsBinder(CodeCompilationUnit cu, string ispc_headerFilename, string outputCs_filename, string nativeLibName)
         {
-            string header_content = File.ReadAllText(ispc_headerFilename);
 
-            CodeCompilationUnit cu = ParseAutoGenHeader(header_content);
             //from cu=> we generate interface c 
             CodeStringBuilder sb = new CodeStringBuilder();
             sb.AppendLine("//AUTOGEN," + DateTime.Now.ToString("s"));
