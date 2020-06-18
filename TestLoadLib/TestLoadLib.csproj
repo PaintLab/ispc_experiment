@@ -38,8 +38,10 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutoGenBinders\mandelbrot.cs" />
     <Compile Include="AutoGenBinders\simple.cs" />
     <Compile Include="AutoGenBinders\sort.cs" />
     <Compile Include="Program.cs" />
@@ -47,6 +49,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="mandelbrot.ispc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="simple.ispc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
