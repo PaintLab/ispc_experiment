@@ -292,7 +292,7 @@ namespace BridgeBuilder.Ispc
             sb.AppendLine("#include <stdlib.h>");
             sb.AppendLine("//Include the header file that the ispc compiler generates");
             sb.AppendLine($"#include \"{ Path.GetFileName(ispc_headerFilename) }\"");
-
+            sb.AppendLine("using namespace ispc;");
             //c_inf.AppendLine("using namespace ispc;");
             sb.AppendLine("extern \"C\"{");
 
@@ -311,7 +311,7 @@ namespace BridgeBuilder.Ispc
                             sb.AppendLine("__declspec(dllexport) "); //WINDOWS
 
                             sb.Append(met.ToString(IspcBridgeFunctionNamePrefix));
-
+                           
                             sb.AppendLine("{");
                             string ret = met.ReturnType.ToString();
                             if (ret != "void")
@@ -330,10 +330,9 @@ namespace BridgeBuilder.Ispc
                             sb.AppendLine(");");
                             sb.AppendLine("}");
                         }
-                        else if (nsMember is CodeTypeDeclaration other)
+                        else if (nsMember is CodeTypeDeclaration other && other.Kind == TypeKind.Struct)
                         {
-                            //
-
+                            //skip C struct  regen
                         }
                         else
                         {
@@ -352,6 +351,7 @@ namespace BridgeBuilder.Ispc
             string file_content = sb.ToString();
             File.WriteAllText(outputC_filename, file_content);
         }
+        
 
         /// <summary>
         /// generate CS binder
@@ -373,9 +373,15 @@ namespace BridgeBuilder.Ispc
             sb.AppendLine("using System.Runtime.InteropServices;");
 
             sb.AppendLine();
-            sb.AppendLine("using int32_t = System.Int32;");
-            sb.AppendLine("using uint32_t = System.UInt32;");
-            sb.AppendLine();
+
+            sb.AppendLine(@"
+using uint8_t = System.Byte;
+using int8_t = System.SByte;
+using uint16_t = System.UInt16;
+using int16_t = System.Int16;
+using int32_t = System.Int32;
+using uint32_t = System.UInt32;
+");
 
             //
             sb.AppendLine("namespace " + Path.GetFileNameWithoutExtension(Path.GetFileName(ispc_headerFilename)) + "{");
@@ -402,7 +408,10 @@ namespace BridgeBuilder.Ispc
                             {
                                 CodeMethodParameter par = met.Parameters[i];
                                 if (i > 0) { sb.Append(","); }
-                                sb.Append(par.ParameterType.ToString());
+
+                                string parType = CsGetProperParameterType(par.ParameterType);
+
+                                sb.Append(parType);
                                 sb.Append(" ");
                                 sb.Append(par.ParameterName);
                             }
@@ -410,9 +419,26 @@ namespace BridgeBuilder.Ispc
                             sb.AppendLine(";");
 
                         }
-                        else if (ns_mb is CodeTypeDeclaration typedecl)
+                        else if (ns_mb is CodeTypeDeclaration typedecl && typedecl.Kind == TypeKind.Struct)
                         {
+                            //generate struct (cs version) for
+                            sb.AppendLine("public struct " + typedecl.Name + "{");
+                            foreach (CodeMemberDeclaration structMb in typedecl.GetMemberIter())
+                            {
+                                switch (structMb.MemberKind)
+                                {
+                                    default: throw new NotSupportedException();
+                                    case CodeMemberKind.Field:
+                                        {
+                                            CodeFieldDeclaration fieldDecl = (CodeFieldDeclaration)structMb;
+                                            CsWriteField(sb, fieldDecl);
 
+                                        }
+                                        break;
+                                }
+
+                            }
+                            sb.AppendLine("}");
                         }
                         else
                         {
@@ -431,6 +457,70 @@ namespace BridgeBuilder.Ispc
 
             string file_content = sb.ToString();
             File.WriteAllText(outputCs_filename, file_content);
+        }
+
+        /// <summary>
+        /// get parameter type for cs interface
+        /// </summary>
+        /// <param name="metParType"></param>
+        /// <returns></returns>
+        static string CsGetProperParameterType(CodeTypeReference metParType)
+        {
+
+            if (metParType.Kind == CodeTypeReferenceKind.Array)
+            {
+                throw new NotSupportedException();
+            }
+            else if (metParType.Kind == CodeTypeReferenceKind.ByRef)
+            {
+                //eg. A&
+                //inner type
+                CodeByRefTypeReference byRefTypeRef = (CodeByRefTypeReference)metParType;
+                string innerElemType = CsGetProperParameterType(byRefTypeRef.ElementType);
+                return innerElemType + "*";
+            }
+            else
+            {
+                //a simple type
+                if (metParType.Name == "char")
+                {
+                    throw new NotSupportedException();
+                }
+            }
+            return metParType.ToString();
+        }
+        static void CsWriteField(CodeStringBuilder sb, CodeFieldDeclaration field)
+        {
+
+            sb.Append("public ");
+            CodeTypeReference fieldType = field.FieldType;
+            if (fieldType.Kind == CodeTypeReferenceKind.Array)
+            {
+                CodeArrayReference arrField = (CodeArrayReference)fieldType;
+                if (arrField.ElemType.Kind == CodeTypeReferenceKind.Array)
+                {
+
+                    CodeArrayReference next = (CodeArrayReference)arrField.ElemType;
+                    //only a[][] , 2 levels
+                    if (next.ElemType.Kind == CodeTypeReferenceKind.Array) { throw new NotSupportedException(); }
+
+                    int size = arrField.Size * next.Size;
+
+                    sb.Append("fixed " + next.ElemType.ToString() + " " + field.Name + "[" + size + "];");
+                }
+                else
+                {
+                    //simple array
+                    sb.Append("fixed " + arrField.ElemType.ToString() + " " + field.Name + "[" + arrField.Size + "];");
+                }
+            }
+            else
+            {
+                sb.Append(fieldType.ToString());
+                sb.Append(" ");
+                sb.Append(field.Name);
+                sb.AppendLine(";");
+            }
         }
     }
 }
