@@ -41,6 +41,7 @@
     <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutoGenBinders\kernels.cs" />
     <Compile Include="AutoGenBinders\mandelbrot.cs" />
     <Compile Include="AutoGenBinders\mandelbrot_task.cs" />
     <Compile Include="AutoGenBinders\simple.cs" />

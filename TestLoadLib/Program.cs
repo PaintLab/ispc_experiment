@@ -262,6 +262,8 @@ namespace TestLoadLib
             string dllName = module + ".dll";
             IntPtr dllPtr = LoadLibrary(dllName);
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+
         }
 
         static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
