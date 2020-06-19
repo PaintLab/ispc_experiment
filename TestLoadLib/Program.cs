@@ -289,8 +289,9 @@ namespace TestLoadLib
 
         static void Ispc_TestCallback()
         {
+            //read more about callback from ispc
+            //on  https://ispc.github.io/ispc.html => section "Interoperability with The Application" 
 
-            //TODO: check if we need to rebuild or not
             string module = "callback_test";
             bool rebuild = NeedRebuild(module);
             if (rebuild)
