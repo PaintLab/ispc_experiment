@@ -22,7 +22,8 @@ namespace TestLoadLib
             //Ispc_SortExample();
             //Ispc_MandelbrotExample();
             //Ispc_MandlebrotTaskExample();
-            Ispc_DeferredShading();
+            //Ispc_DeferredShading();
+            Ispc_TestCallback();
 #if DEBUG
             // dbugParseHeader(@"deferred\kernels_ispc.h");
 #endif
@@ -271,7 +272,37 @@ namespace TestLoadLib
                 //port ispc-14-dev-windows\examples\deferred\main.cpp
             }
         }
+        static void Ispc_TestCallback()
+        {
 
+            //TODO: check if we need to rebuild or not
+            string module = "callback_test";
+            bool rebuild = NeedRebuild(module);
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                     currentDir + "\\callback_test1.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            string dllName = module + ".dll";
+            IntPtr dllPtr = LoadLibrary(dllName);
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            IntPtr funct = GetProcAddress(dllPtr, "set_managed_callback"); //test with raw name
+            if (funct == IntPtr.Zero) { throw new NotSupportedException(); }
+            
+
+
+        }
         static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
         {
             //convert to grayscale image
