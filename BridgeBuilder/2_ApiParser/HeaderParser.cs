@@ -301,7 +301,7 @@ namespace BridgeBuilder
                                 case "template":
                                     {
                                         //skip template 
-                                        this._templateNotation = ParseTemplateNotation();
+                                        _templateNotation = ParseTemplateNotation();
                                     }
                                     break;
                                 case "extern":
@@ -330,7 +330,7 @@ namespace BridgeBuilder
                                     {
                                         //may be global func
                                         //should be method
-                                        this._currentTokenIndex--;
+                                        _currentTokenIndex--;
                                         ParseTypeMember(globalTypeDecl);
                                     }
                                     break;
@@ -350,7 +350,7 @@ namespace BridgeBuilder
             switch (tk.TokenKind)
             {
                 case TokenKind.LineComment:
-                    this._lineComments.Add(tk);
+                    _lineComments.Add(tk);
                     _currentTokenIndex++;
                     return ExpectId();
                 case TokenKind.PreprocessingDirective:
@@ -376,7 +376,7 @@ namespace BridgeBuilder
             switch (tk.TokenKind)
             {
                 case TokenKind.LineComment:
-                    this._lineComments.Add(tk);
+                    _lineComments.Add(tk);
                     _currentTokenIndex++;
                     return ExpectToken(k, value);
                 case TokenKind.PreprocessingDirective:
@@ -497,6 +497,8 @@ namespace BridgeBuilder
             }
             //
         }
+
+
         bool ExpectPunc(string expectedPunc)
         {
             //read next and 
@@ -547,12 +549,12 @@ namespace BridgeBuilder
         {
             //class name
 
-            MemberAccessibility prev_accessibility = this._currentMemberAccessibilityMode; //save
+            MemberAccessibility prev_accessibility = _currentMemberAccessibilityMode; //save
             var codeTypeDecl = new CodeTypeDeclaration();
-            if (this._templateNotation != null)
+            if (_templateNotation != null)
             {
-                codeTypeDecl.TemplateNotation = this._templateNotation;
-                this._templateNotation = null;//reset
+                codeTypeDecl.TemplateNotation = _templateNotation;
+                _templateNotation = null;//reset
             }
 
             codeTypeDecl.Name = ExpectId();
@@ -672,7 +674,7 @@ namespace BridgeBuilder
             }
 
             //------
-            this._currentMemberAccessibilityMode = prev_accessibility; //restore back
+            _currentMemberAccessibilityMode = prev_accessibility; //restore back
             return codeTypeDecl;
         }
 
@@ -850,7 +852,7 @@ namespace BridgeBuilder
                 codeTypeDecl.AddMember(
                     new CodeCTypeDef(
                         new CodeSimpleTypeReference(struct_decl.Name), typedef_anotherName)
-                    { LineComments = comments, MemberAccessibility = this._currentMemberAccessibilityMode }
+                    { LineComments = comments, MemberAccessibility = _currentMemberAccessibilityMode }
                 );
                 return true;
             }
@@ -906,7 +908,7 @@ namespace BridgeBuilder
                     }
                 }
 
-                funcTypeDecl.MemberAccessibility = this._currentMemberAccessibilityMode;
+                funcTypeDecl.MemberAccessibility = _currentMemberAccessibilityMode;
                 funcTypeDecl.LineComments = comments;
                 codeTypeDecl.AddMember(funcTypeDecl);
 
@@ -924,7 +926,7 @@ namespace BridgeBuilder
             //    throw new NotSupportedException();
             //}
 
-            //codeTypeDecl.AddMember(new CodeCTypeDef(from, to) { LineComments = comments, MemberAccessibility = this._currentMemberAccessibilityMode });
+            //codeTypeDecl.AddMember(new CodeCTypeDef(from, to) { LineComments = comments, MemberAccessibility = _currentMemberAccessibilityMode });
 
             //return !ExpectPunc("}");
         }
@@ -1127,27 +1129,50 @@ namespace BridgeBuilder
 
             }
 #endif
-
+            if (ExpectPunc("}"))
+            {
+                return false;
+            }
             //member modifiers
             //this version must be public 
             //parse each member 
             if (ExpectId("public") && ExpectPunc(":"))
             {
-                this._currentMemberAccessibilityMode = MemberAccessibility.Public;
+                _currentMemberAccessibilityMode = MemberAccessibility.Public;
             }
             else if (ExpectId("private") && ExpectPunc(":"))
             {
-                this._currentMemberAccessibilityMode = MemberAccessibility.Private;
+                _currentMemberAccessibilityMode = MemberAccessibility.Private;
             }
             else if (ExpectId("protected") && ExpectPunc(":"))
             {
-                this._currentMemberAccessibilityMode = MemberAccessibility.Protected;
+                _currentMemberAccessibilityMode = MemberAccessibility.Protected;
             }
             //---------------------------
             if (ExpectId("typedef"))
             {
                 //type def
                 return ParseCTypeDef(codeTypeDecl);
+            }
+
+            if (ExpectId("extern"))
+            {
+                //
+                //extern member of current type decl , or current namespace
+                //
+                if (ExpectLiteralString("\"C\""))
+                {
+                    if (ExpectPunc("{"))
+                    {
+                        while (ParseTypeMember(codeTypeDecl)) ;
+
+                        return true;
+                    }
+                    else
+                    {
+                        throw new NotSupportedException();
+                    }
+                }
             }
 
             if (ExpectId("friend"))
@@ -1442,7 +1467,7 @@ namespace BridgeBuilder
                 met.IsStatic = isStatic;
                 met.IsVirtual = isVirtual;
                 met.IsInline = isInline;
-                met.MemberAccessibility = this._currentMemberAccessibilityMode;
+                met.MemberAccessibility = _currentMemberAccessibilityMode;
                 met.CppExplicitOwnerType = cppExplicitOwnerTypeName;
                 //
                 if (retType.ToString() == codeTypeDecl.Name && name == null)
@@ -1538,7 +1563,7 @@ namespace BridgeBuilder
                 Token[] comments = FlushCollectedLineComments();
                 //this is code field decl
                 CodeFieldDeclaration field = new CodeFieldDeclaration();
-                field.MemberAccessibility = this._currentMemberAccessibilityMode;
+                field.MemberAccessibility = _currentMemberAccessibilityMode;
                 codeTypeDecl.AddMember(field);
                 field.Name = name;
                 field.LineComments = comments;
@@ -1549,7 +1574,9 @@ namespace BridgeBuilder
             }
             else if (ExpectPunc("["))
             {
-                //array
+                //array...
+                //float arr1[4][4];
+                //int32_t arr2[16]; 
 
                 if (ExpectLiternalNumber(out Token arrLen))
                 {
@@ -1562,6 +1589,28 @@ namespace BridgeBuilder
                 {
                     throw new NotSupportedException();
                 }
+
+                CodeArrayReference arrType = new CodeArrayReference(retType, int.Parse(arrLen.Content));
+
+            ARR_RECHECK:
+                if (ExpectPunc("["))
+                {
+                    if (ExpectLiternalNumber(out Token arrLen2))
+                    {
+                        if (!ExpectPunc("]"))
+                        {
+                            throw new NotSupportedException();
+                        }
+                    }
+                    else
+                    {
+                        throw new NotSupportedException();
+                    }
+                    CodeArrayReference arr2 = new CodeArrayReference(arrType, int.Parse(arrLen2.Content));
+                    arrType = arr2;
+                    goto ARR_RECHECK;
+                }
+
                 if (!ExpectPunc(";"))
                 {
                     throw new NotSupportedException();
@@ -1569,17 +1618,25 @@ namespace BridgeBuilder
 
                 Token[] comments = FlushCollectedLineComments();
                 CodeFieldDeclaration field = new CodeFieldDeclaration();
-                field.MemberAccessibility = this._currentMemberAccessibilityMode;
+                field.MemberAccessibility = _currentMemberAccessibilityMode;
                 codeTypeDecl.AddMember(field);
                 field.Name = name;
                 field.LineComments = comments;
-                field.FieldType = new CodeArrayReference(retType, int.Parse(arrLen.Content));
+
+                field.FieldType = arrType; //**
                 field.IsStatic = isStatic;
                 field.IsConst = isConst;
+
+                //after array 
+
                 return !ExpectPunc("}");
             }
             else
             {
+
+                Token tk = _tokenList[_currentTokenIndex];
+                int lineNo = tk.LineNo;
+
                 throw new NotSupportedException();
             }
 

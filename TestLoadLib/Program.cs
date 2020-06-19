@@ -21,27 +21,40 @@ namespace TestLoadLib
             //Ispc_SimpleExample();
             //Ispc_SortExample();
             //Ispc_MandelbrotExample();
-            Ispc_MandlebrotTaskExample();
+            //Ispc_MandlebrotTaskExample();
+            Ispc_DeferredShading();
+#if DEBUG
+            // dbugParseHeader(@"deferred\kernels_ispc.h");
+#endif
         }
+#if DEBUG
 
+        static void dbugParseHeader(string filename)
+        {
+            IspcBuilder builder = new IspcBuilder();
+            builder.ParseAutoGenHeaderFromFile(filename);
+
+        }
+#endif
 
         static void Ispc_SimpleExample()
         {
             //from: ispc-14-dev-windows\examples\simple
-            string dllName = "simple.dll";
+            string module = "simple";
 
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild("simple");
+            bool rebuild = NeedRebuild(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
                 ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
-                ispcBuilder.IspcFilename = "simple.ispc";
-                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\simple.cs";
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
                 ispcBuilder.RebuildLibraryAndAPI();
 
             }
 
+            string dllName = module + ".dll";
             IntPtr dllPtr = LoadLibrary(dllName);
 
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
@@ -81,15 +94,15 @@ namespace TestLoadLib
         {
             //from: ispc-14-dev-windows\examples\sort
 
-            string dllName = "sort.dll";
+            string module = "sort";
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild("sort");
+            bool rebuild = NeedRebuild(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
                 ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
-                ispcBuilder.IspcFilename = "sort.ispc";
-                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\sort.cs";
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
 
                 string currentDir = Directory.GetCurrentDirectory();
                 ispcBuilder.AdditionalInputItems = new string[]
@@ -100,6 +113,7 @@ namespace TestLoadLib
 
             }
 
+            string dllName = module + ".dll";
             IntPtr dllPtr = LoadLibrary(dllName);
 
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
@@ -131,15 +145,15 @@ namespace TestLoadLib
         static void Ispc_MandelbrotExample()
         {
             //from: ispc-14-dev-windows\examples\mandelbrot
-            string dllName = "mandelbrot.dll";
+            string module = "mandelbrot.dll";
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild("mandelbrot");
+            bool rebuild = NeedRebuild(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
                 ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
-                ispcBuilder.IspcFilename = "mandelbrot.ispc";
-                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\mandelbrot.cs";
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
 
                 string currentDir = Directory.GetCurrentDirectory();
                 ispcBuilder.AdditionalInputItems = new string[]
@@ -149,6 +163,7 @@ namespace TestLoadLib
                 ispcBuilder.RebuildLibraryAndAPI();
             }
 
+            string dllName = module + ".dll";
             IntPtr dllPtr = LoadLibrary(dllName);
 
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
@@ -176,15 +191,16 @@ namespace TestLoadLib
         static void Ispc_MandlebrotTaskExample()
         {
             //from: ispc-14-dev-windows\examples\mandelbrot
-            string dllName = "mandelbrot_task.dll";
+
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild("mandelbrot_task");
+            string module = "mandelbrot_task";
+            bool rebuild = NeedRebuild(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
                 ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
-                ispcBuilder.IspcFilename = "mandelbrot_task.ispc";
-                ispcBuilder.AutoCsTargetFile = "..\\..\\AutoGenBinders\\mandelbrot_task.cs";
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
 
                 string currentDir = Directory.GetCurrentDirectory();
                 ispcBuilder.AdditionalInputItems = new string[]
@@ -194,6 +210,7 @@ namespace TestLoadLib
                 ispcBuilder.RebuildLibraryAndAPI();
             }
 
+            string dllName = module + ".dll";
             IntPtr dllPtr = LoadLibrary(dllName);
 
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
@@ -219,6 +236,41 @@ namespace TestLoadLib
             SaveManelbrotImage(buffer, width, height, "test_mandelbrot_task.png");
         }
 
+        static void Ispc_DeferredShading()
+        {
+            //from ispc-14-dev-windows\examples\deferred\kernels.ispc
+
+            //TODO: check if we need to rebuild or not
+            string module = "kernels";
+            bool rebuild = NeedRebuild(module);
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp",
+                    currentDir + "\\deferred.h"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            string dllName = module + ".dll";
+            IntPtr dllPtr = LoadLibrary(dllName);
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            unsafe
+            {
+                byte[] data_file = File.ReadAllBytes("Data/pp1280x720.bin");
+                kernels_ispc.NativeMethods.InputDataArrays array = new kernels_ispc.NativeMethods.InputDataArrays();
+                //TODO:
+                //port ispc-14-dev-windows\examples\deferred\main.cpp
+            }
+        }
 
         static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
         {
