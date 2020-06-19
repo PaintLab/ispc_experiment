@@ -1,4 +1,4 @@
-/*x15*///AUTOGEN,2020-06-19T15:39:35
+/*x15*///AUTOGEN,2020-06-19T15:52:13
 /*x16*///Tools: ispc and BridgeBuilder
 /*x17*///Src: D:\projects\ispc_experiment\TestLoadLib\bin\Debug/temp/callback_test_ispc.h
 /*x18*/
