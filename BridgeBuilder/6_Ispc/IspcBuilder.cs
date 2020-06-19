@@ -290,8 +290,16 @@ namespace BridgeBuilder.Ispc
 
             sb.AppendLine("#include <stdio.h>");
             sb.AppendLine("#include <stdlib.h>");
-            sb.AppendLine("//Include the header file that the ispc compiler generates");
+            sb.AppendLine("//Include the header file that the ispc compiler generates");            
             sb.AppendLine($"#include \"{ Path.GetFileName(ispc_headerFilename) }\"");
+
+            sb.AppendLine(@"#ifdef _WIN32 
+#define MY_DLL_EXPORT __declspec(dllexport)
+#else 
+#define MY_DLL_EXPORT
+#endif
+ ");
+
             sb.AppendLine("using namespace ispc;");
             //c_inf.AppendLine("using namespace ispc;");
             sb.AppendLine("extern \"C\"{");
@@ -308,7 +316,7 @@ namespace BridgeBuilder.Ispc
                     {
                         if (nsMember is CodeMethodDeclaration met)
                         {
-                            sb.AppendLine("__declspec(dllexport) "); //WINDOWS
+                            sb.AppendLine("MY_DLL_EXPORT "); //WINDOWS
 
                             sb.Append(met.ToString(IspcBridgeFunctionNamePrefix));
 

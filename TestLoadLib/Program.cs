@@ -22,7 +22,8 @@ namespace TestLoadLib
             //Ispc_SortExample();
             //Ispc_MandelbrotExample();
             //Ispc_MandlebrotTaskExample();
-            Ispc_DeferredShading();
+            //Ispc_DeferredShading();
+            Ispc_TestCallback();
 #if DEBUG
             // dbugParseHeader(@"deferred\kernels_ispc.h");
 #endif
@@ -90,6 +91,7 @@ namespace TestLoadLib
             }
         }
 
+
         static void Ispc_SortExample()
         {
             //from: ispc-14-dev-windows\examples\sort
@@ -141,6 +143,9 @@ namespace TestLoadLib
             }
 
         }
+
+
+
 
         static void Ispc_MandelbrotExample()
         {
@@ -270,6 +275,79 @@ namespace TestLoadLib
                 //TODO:
                 //port ispc-14-dev-windows\examples\deferred\main.cpp
             }
+        }
+
+
+
+        delegate void ManagedCallback(int data);
+        delegate void SetManagedCallback(IntPtr m);
+
+        static SetManagedCallback s_setManagedCallback;
+
+        static ManagedCallback m_callback;
+        static IntPtr m_callback_ptr;
+
+        static void Ispc_TestCallback()
+        {
+            //read more about callback from ispc
+            //on  https://ispc.github.io/ispc.html => section "Interoperability with The Application" 
+
+            string module = "callback_test";
+            bool rebuild = NeedRebuild(module);
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                     currentDir + "\\callback_test1.cpp"
+                };
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            string dllName = module + ".dll";
+            IntPtr dllPtr = LoadLibrary(dllName);
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            IntPtr funct = GetProcAddress(dllPtr, "set_managed_callback"); //test with raw name 
+            if (funct == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            GetManagedDelegate(funct, out s_setManagedCallback);
+
+            //-----------
+            m_callback = (int a) =>
+            {
+#if DEBUG
+                //System.Diagnostics.Debugger.Break();
+                System.Diagnostics.Debug.WriteLine("callback from ispc");
+#endif
+            };
+            m_callback_ptr = Marshal.GetFunctionPointerForDelegate(m_callback);
+            s_setManagedCallback(m_callback_ptr);
+            //-----------
+            //test call to ispc
+            //test1
+            int[] inputData = new int[]
+            {
+                1<<16,  2<<16, 3<<16,  4<<16,
+                5<<16,  6<<16, 7<<16,  8<<16,
+                9<<16, 10<<16, 11<<16,  12<<16,
+            };
+            unsafe
+            {
+                fixed (int* h = &inputData[0])
+                {
+                    callback_test_ispc.NativeMethods.clear(h, 0, inputData.Length);
+                }
+            }
+        }
+        static void GetManagedDelegate<T>(IntPtr ptr, out T delOutput)
+        {
+            delOutput = (T)(object)Marshal.GetDelegateForFunctionPointer(ptr, typeof(T));
         }
 
         static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
