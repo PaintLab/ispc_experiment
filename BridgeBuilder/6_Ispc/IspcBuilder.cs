@@ -311,7 +311,7 @@ namespace BridgeBuilder.Ispc
                             sb.AppendLine("__declspec(dllexport) "); //WINDOWS
 
                             sb.Append(met.ToString(IspcBridgeFunctionNamePrefix));
-                           
+
                             sb.AppendLine("{");
                             string ret = met.ReturnType.ToString();
                             if (ret != "void")
@@ -351,7 +351,7 @@ namespace BridgeBuilder.Ispc
             string file_content = sb.ToString();
             File.WriteAllText(outputC_filename, file_content);
         }
-        
+
 
         /// <summary>
         /// generate CS binder
@@ -421,7 +421,8 @@ using uint32_t = System.UInt32;
                         }
                         else if (ns_mb is CodeTypeDeclaration typedecl && typedecl.Kind == TypeKind.Struct)
                         {
-                            //generate struct (cs version) for
+                            //generate struct (cs version) 
+                            sb.AppendLine("[StructLayout(LayoutKind.Sequential)]");
                             sb.AppendLine("public struct " + typedecl.Name + "{");
                             foreach (CodeMemberDeclaration structMb in typedecl.GetMemberIter())
                             {
