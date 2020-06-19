@@ -46,6 +46,12 @@
     <Compile Include="AutoGenBinders\mandelbrot_task.cs" />
     <Compile Include="AutoGenBinders\simple.cs" />
     <Compile Include="AutoGenBinders\sort.cs" />
+    <None Include="Data\pp1280x720.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\pp1920x1200.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="kernels.ispc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

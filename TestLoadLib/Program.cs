@@ -263,7 +263,13 @@ namespace TestLoadLib
             IntPtr dllPtr = LoadLibrary(dllName);
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
 
-
+            unsafe
+            {
+                byte[] data_file = File.ReadAllBytes("Data/pp1280x720.bin");
+                kernels_ispc.NativeMethods.InputDataArrays array = new kernels_ispc.NativeMethods.InputDataArrays();
+                //TODO:
+                //port ispc-14-dev-windows\examples\deferred\main.cpp
+            }
         }
 
         static void SaveManelbrotImage(int[] buffer, int width, int height, string filename)
