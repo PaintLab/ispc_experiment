@@ -35,6 +35,13 @@ namespace BridgeBuilder.Vcx
                 System.Diagnostics.Debug.Write("MSBUILD not found!");
             }
         }
+        protected static void CreateDirIfNotExists(string dirname)
+        {
+            if (!Directory.Exists(dirname))
+            {
+                Directory.CreateDirectory(dirname);
+            }
+        }
         protected static void MoveFileOrReplaceIfExists(string src, string dest)
         {
             if (File.Exists(dest))

@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-
+using System.Text;
 using BridgeBuilder.Vcx;
 
 namespace BridgeBuilder.Ispc
@@ -45,15 +45,11 @@ namespace BridgeBuilder.Ispc
             gen.FullProjBuildPath = tmp_dir;
             string finalProductName = gen.GetFinalProductName(configKind);
 
-            //build ispc                 
-
-            if (!Directory.Exists(tmp_dir))
-            {
-                Directory.CreateDirectory(tmp_dir);
-            }
+            //-----           
+            CreateDirIfNotExists(tmp_dir);
+            //
 
             string ispc_src = IspcFilename;
-
             string ispc_obj = tmp_dir + "/" + onlyProjectName + ".obj";
             string ispc_llvm_text = tmp_dir + "/" + onlyProjectName + "_ispc.llvm.txt";
             string ispc_cpp = tmp_dir + "/" + onlyProjectName + "_ispc.cpp";
@@ -70,29 +66,31 @@ namespace BridgeBuilder.Ispc
             procStartInfo.UseShellExecute = false;
             procStartInfo.RedirectStandardOutput = true;
             procStartInfo.RedirectStandardError = true;
+
             System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
 
 
-
-            var errReader = proc.StandardError;
+            StreamReader errReader = proc.StandardError;
             {
                 string line = errReader.ReadLine();
                 while (line != null)
                 {
+                    System.Diagnostics.Debug.WriteLine(line);
                     line = errReader.ReadLine();
                 }
             }
-
-            var outputStrmReader = proc.StandardOutput;
+            StreamReader outputStrmReader = proc.StandardOutput;
             {
                 string line = outputStrmReader.ReadLine();
                 while (line != null)
                 {
+                    System.Diagnostics.Debug.WriteLine(line);
                     line = outputStrmReader.ReadLine();
                 }
             }
 
             proc.WaitForExit();
+
             int exit_code2 = proc.ExitCode;
             if (exit_code2 != 0)
             {
@@ -112,8 +110,6 @@ namespace BridgeBuilder.Ispc
             GenerateCsBinder(cu, ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
 
             //move cs code to src folder
-
-
             if (AutoCsTargetFile != null)
             {
                 MoveFileOrReplaceIfExists(cs_method_invoke_filename, AutoCsTargetFile);
@@ -131,8 +127,6 @@ namespace BridgeBuilder.Ispc
             {
                 foreach (string s in AdditionalInputItems)
                 {
-
-
                     switch (Path.GetExtension(s))
                     {
                         default: throw new NotSupportedException();
@@ -185,7 +179,7 @@ namespace BridgeBuilder.Ispc
             //build pass, then copy the result dll back     
             MoveFileOrReplaceIfExists(finalProductName, Path.GetFileName(finalProductName));
 
-        }    
+        }
 
 
         static void CheckIspcBinary()
@@ -497,5 +491,22 @@ using uint32_t = System.UInt32;
                 sb.AppendLine(";");
             }
         }
+
+        public static bool NeedRebuildIspc(string ispc_module_name)
+        {
+            //ASSUME!
+            return NeedRebuild(ispc_module_name + ".ispc", ispc_module_name + ".dll");
+        }
+        public static bool NeedRebuild(string ispc_src, string dllLib)
+        {//ASSUME!
+            if (File.Exists(dllLib))
+            {
+                DateTime dllWriteTime = File.GetLastWriteTime(dllLib);
+                DateTime ispcSrcWriteTime = File.GetLastWriteTime(ispc_src);
+                return ispcSrcWriteTime > dllWriteTime;
+            }
+            return true;
+        }
+
     }
 }
