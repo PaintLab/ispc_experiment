@@ -60,6 +60,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <Compile Include="IspcCodeGen\IspcBuilder.cs" />
+    <Compile Include="IspcCodeGen\MyVcxBuilder.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -85,6 +86,7 @@
     <Content Include="deferred.h">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Compile Include="IspcCodeGen\GeneralBuilder.cs" />
     <Content Include="tasksys.cpp">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

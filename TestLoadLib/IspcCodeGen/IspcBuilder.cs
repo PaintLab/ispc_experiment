@@ -7,24 +7,21 @@ using BridgeBuilder.Vcx;
 
 namespace BridgeBuilder.Ispc
 {
-    class IspcBuilder
+
+
+    class IspcBuilder : GeneralVcxBuilder
     {
         //helper for Intel® Implicit SPMD Program Compiler (ISPC)
         //see more about ispc =>https://ispc.github.io/
 
-        static string s_MsBuildPath = null;
+
         static string s_ispc = @"D:\projects\ispc-14-dev-windows\bin\ispc.exe";
         static bool s_checkIspc;
 
 
-
-        public ProjectConfigKind ProjectConfigKind { get; set; } = ProjectConfigKind.Debug;
         public string IspcFilename { get; set; }
         public string IspcBridgeFunctionNamePrefix { get; set; } = "my_";
         public string AutoCsTargetFile { get; set; }
-
-        public string[] AdditionalInputItems { get; set; }
-
 
         public void RebuildLibraryAndAPI()
         {
@@ -75,15 +72,17 @@ namespace BridgeBuilder.Ispc
             procStartInfo.RedirectStandardError = true;
             System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
 
+
+
             var errReader = proc.StandardError;
             {
                 string line = errReader.ReadLine();
-
                 while (line != null)
                 {
                     line = errReader.ReadLine();
                 }
             }
+
             var outputStrmReader = proc.StandardOutput;
             {
                 string line = outputStrmReader.ReadLine();
@@ -186,41 +185,8 @@ namespace BridgeBuilder.Ispc
             //build pass, then copy the result dll back     
             MoveFileOrReplaceIfExists(finalProductName, Path.GetFileName(finalProductName));
 
-        }
-        static void MoveFileOrReplaceIfExists(string src, string dest)
-        {
-            if (File.Exists(dest))
-            {
-                //delete
-                File.Delete(dest);
-            }
-            File.Move(src, dest);
-        }
-        static void UpdateMsBuildPath()
-        {
-            if (s_MsBuildPath != null) { return; }
+        }    
 
-            string[] msbuildPathTryList = new string[]
-            {
-                @"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
-                @"C:\Program Files (x86)\Microsoft Visual Studio\2019\MSBuild\15.0\Bin\MSBuild.exe"
-            };
-
-            bool foundMsBuild = false;
-            for (int i = msbuildPathTryList.Length - 1; i >= 0; --i)
-            {
-                if (File.Exists(msbuildPathTryList[i]))
-                {
-                    s_MsBuildPath = msbuildPathTryList[i];
-                    foundMsBuild = true;
-                    break;//
-                }
-            }
-            if (!foundMsBuild)
-            {
-                System.Diagnostics.Debug.Write("MSBUILD not found!");
-            }
-        }
 
         static void CheckIspcBinary()
         {
@@ -290,7 +256,7 @@ namespace BridgeBuilder.Ispc
 
             sb.AppendLine("#include <stdio.h>");
             sb.AppendLine("#include <stdlib.h>");
-            sb.AppendLine("//Include the header file that the ispc compiler generates");            
+            sb.AppendLine("//Include the header file that the ispc compiler generates");
             sb.AppendLine($"#include \"{ Path.GetFileName(ispc_headerFilename) }\"");
 
             sb.AppendLine(@"#ifdef _WIN32 
