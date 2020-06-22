@@ -41,12 +41,16 @@
     <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutoGenBinders\ao.cs" />
     <Compile Include="AutoGenBinders\callback_test.cs" />
     <Compile Include="AutoGenBinders\kernels.cs" />
     <Compile Include="AutoGenBinders\mandelbrot.cs" />
     <Compile Include="AutoGenBinders\mandelbrot_task.cs" />
     <Compile Include="AutoGenBinders\simple.cs" />
     <Compile Include="AutoGenBinders\sort.cs" />
+    <None Include="ao.ispc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="callback_test.ispc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

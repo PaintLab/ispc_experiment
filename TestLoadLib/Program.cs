@@ -25,8 +25,9 @@ namespace TestLoadLib
             //Ispc_MandlebrotTaskExample();
             //Ispc_DeferredShading();
             //Ispc_TestCallback();
+            //TestGenerateVcxBuilder();
 
-            TestGenerateVcxBuilder();
+            Ispc_AoBench();
 #if DEBUG
             // dbugParseHeader(@"deferred\kernels_ispc.h");
 #endif
@@ -361,7 +362,7 @@ namespace TestLoadLib
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
 
             GetManagedDelegate(dllPtr, "set_managed_callback", out s_setManagedCallback);
-            if (s_setManagedCallback == null) { throw new NotSupportedException(); } 
+            if (s_setManagedCallback == null) { throw new NotSupportedException(); }
 
             //-----------
             m_callback = (int a) =>
@@ -390,6 +391,121 @@ namespace TestLoadLib
                     callback_test_ispc.NativeMethods.clear(h, 0, inputData.Length);
                 }
             }
+        }
+
+
+        static void Ispc_AoBench()
+        {
+            string module = "ao";
+            bool rebuild = NeedRebuildIspc(module);
+            if (rebuild)
+            {
+                IspcBuilder ispcBuilder = new IspcBuilder();
+                ispcBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+                ispcBuilder.IspcFilename = module + ".ispc";
+                ispcBuilder.AutoCsTargetFile = $"..\\..\\AutoGenBinders\\{module}.cs";
+
+                string currentDir = Directory.GetCurrentDirectory();
+                ispcBuilder.AdditionalInputItems = new string[]
+                {
+                    currentDir + "\\tasksys.cpp"
+                };
+
+                ispcBuilder.RebuildLibraryAndAPI();
+            }
+
+            string dllName = module + ".dll";
+            IntPtr dllPtr = LoadLibrary(dllName);
+            if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
+
+            System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+
+            unsafe
+            {
+                sw.Reset();
+                sw.Start();
+                int w = 800;
+                int h = 600;
+                float[] imgBuffer = new float[w * h * 3];//3 channel
+                fixed (float* img_h = &imgBuffer[0])
+                {
+                    ao_ispc.NativeMethods.ao_ispc(w, h, 2, img_h);
+                }
+                sw.Stop();
+                System.Diagnostics.Debug.WriteLine("ao_ms:" + sw.ElapsedMilliseconds.ToString());
+
+                //conver float[] to img                
+                ConvertToBitmapAndSave(imgBuffer, w, h, "ao1.png");
+              
+                
+            }
+            unsafe
+            {
+                sw.Reset();
+                sw.Start();
+                int w = 800;
+                int h = 600;
+                float[] imgBuffer = new float[w * h * 3];//3 channel
+                fixed (float* img_h = &imgBuffer[0])
+                {
+                    ao_ispc.NativeMethods.ao_ispc_tasks(w, h, 2, img_h);
+                }
+                sw.Stop();
+                System.Diagnostics.Debug.WriteLine("ao_task_ms:" + sw.ElapsedMilliseconds.ToString());
+                //conver float[] to img
+                ConvertToBitmapAndSave(imgBuffer, w, h, "ao2.png"); 
+            }
+        }
+
+        static void ConvertToBitmapAndSave(float[] floatRGB, int width, int height, string filename)
+        {
+
+            byte Clamp(float f)
+            {
+                //NEST
+                int i = (int)(f * 255.5);
+
+                if (i < 0)
+                    i = 0;
+                if (i > 255)
+                    i = 255;
+                return (byte)i;
+            }
+
+            using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                System.Drawing.Imaging.BitmapData bmpdata = bmp.LockBits(
+                    new System.Drawing.Rectangle(0, 0, width, height),
+                    System.Drawing.Imaging.ImageLockMode.ReadWrite, bmp.PixelFormat);
+
+                IntPtr scan0 = bmpdata.Scan0;
+                unsafe
+                {
+                    int* output_ptr = (int*)scan0;
+                    int index = 0;
+
+                    for (int y = 0; y < height; ++y)
+                    {
+                        for (int x = 0; x < width; ++x)
+                        {
+                            byte r = Clamp(floatRGB[index]);
+                            byte g = Clamp(floatRGB[index + 1]);
+                            byte b = Clamp(floatRGB[index + 2]);
+
+                            *output_ptr = (255 << 24) | (r << 16) | (b << 8) | (b << 0);
+
+                            output_ptr++;
+
+                            index += 3;
+                        }
+                    }
+                }
+
+                bmp.UnlockBits(bmpdata);
+                bmp.Save(filename);
+            }
+
+
         }
         static void GetManagedDelegate<T>(IntPtr modulePtr, string funcName, out T delOutput)
         {
