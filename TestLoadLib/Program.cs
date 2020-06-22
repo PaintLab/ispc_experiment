@@ -6,6 +6,7 @@ using System.IO;
 
 using BridgeBuilder;
 using BridgeBuilder.Ispc;
+using BridgeBuilder.Vcx;
 
 namespace TestLoadLib
 {
@@ -23,7 +24,9 @@ namespace TestLoadLib
             //Ispc_MandelbrotExample();
             //Ispc_MandlebrotTaskExample();
             //Ispc_DeferredShading();
-            Ispc_TestCallback();
+            //Ispc_TestCallback();
+
+            TestGenerateVcxBuilder();
 #if DEBUG
             // dbugParseHeader(@"deferred\kernels_ispc.h");
 #endif
@@ -38,13 +41,54 @@ namespace TestLoadLib
         }
 #endif
 
+        static void TestGenerateVcxBuilder()
+        {
+            //from: ispc-14-dev-windows\examples\simple
+            string module = "mysimple_dll1";
+
+            //TODO: check if we need to rebuild or not
+
+            MyVcxBuilder myVcxBuilder = new MyVcxBuilder();
+            myVcxBuilder.ProjectName = "mysimple_dll1";
+            myVcxBuilder.ProjectConfigKind = BridgeBuilder.Vcx.ProjectConfigKind.Debug;
+
+            myVcxBuilder.PrimaryHeader = @"";
+            myVcxBuilder.PrimarySource = @"#ifdef _WIN32 
+#define MY_DLL_EXPORT __declspec(dllexport)
+#else
+#define MY_DLL_EXPORT
+#endif
+            extern ""C"" { 
+            typedef void(__cdecl * managed_callback)(int data);
+            managed_callback myext_mcallback;
+            MY_DLL_EXPORT void set_managed_callback(managed_callback m_callback)
+            {
+                myext_mcallback = m_callback;
+            }
+            }";
+            myVcxBuilder.RebuildLibraryAndAPI();
+
+            string dllName = module + ".dll";
+            IntPtr dllPtr = LoadLibrary(dllName);
+
+            if (dllPtr == IntPtr.Zero)
+            {
+                throw new NotSupportedException();
+            }
+
+            GetManagedDelegate(dllPtr, "set_managed_callback", out s_setManagedCallback);
+            if (s_setManagedCallback == null) { throw new NotSupportedException(); }
+        }
+
+
+
         static void Ispc_SimpleExample()
         {
             //from: ispc-14-dev-windows\examples\simple
             string module = "simple";
 
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild(module);
+            bool rebuild = NeedRebuildIspc(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -98,7 +142,7 @@ namespace TestLoadLib
 
             string module = "sort";
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild(module);
+            bool rebuild = NeedRebuildIspc(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -152,7 +196,7 @@ namespace TestLoadLib
             //from: ispc-14-dev-windows\examples\mandelbrot
             string module = "mandelbrot.dll";
             //TODO: check if we need to rebuild or not
-            bool rebuild = NeedRebuild(module);
+            bool rebuild = NeedRebuildIspc(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -199,7 +243,7 @@ namespace TestLoadLib
 
             //TODO: check if we need to rebuild or not
             string module = "mandelbrot_task";
-            bool rebuild = NeedRebuild(module);
+            bool rebuild = NeedRebuildIspc(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -247,7 +291,7 @@ namespace TestLoadLib
 
             //TODO: check if we need to rebuild or not
             string module = "kernels";
-            bool rebuild = NeedRebuild(module);
+            bool rebuild = NeedRebuildIspc(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -287,13 +331,16 @@ namespace TestLoadLib
         static ManagedCallback m_callback;
         static IntPtr m_callback_ptr;
 
+
+        static bool NeedRebuildIspc(string moduleName) => IspcBuilder.NeedRebuildIspc(moduleName);
+
         static void Ispc_TestCallback()
         {
             //read more about callback from ispc
             //on  https://ispc.github.io/ispc.html => section "Interoperability with The Application" 
 
             string module = "callback_test";
-            bool rebuild = NeedRebuild(module);
+            bool rebuild = NeedRebuildIspc(module);
             if (rebuild)
             {
                 IspcBuilder ispcBuilder = new IspcBuilder();
@@ -313,10 +360,8 @@ namespace TestLoadLib
             IntPtr dllPtr = LoadLibrary(dllName);
             if (dllPtr == IntPtr.Zero) { throw new NotSupportedException(); }
 
-            IntPtr funct = GetProcAddress(dllPtr, "set_managed_callback"); //test with raw name 
-            if (funct == IntPtr.Zero) { throw new NotSupportedException(); }
-
-            GetManagedDelegate(funct, out s_setManagedCallback);
+            GetManagedDelegate(dllPtr, "set_managed_callback", out s_setManagedCallback);
+            if (s_setManagedCallback == null) { throw new NotSupportedException(); } 
 
             //-----------
             m_callback = (int a) =>
@@ -328,6 +373,7 @@ namespace TestLoadLib
             };
             m_callback_ptr = Marshal.GetFunctionPointerForDelegate(m_callback);
             s_setManagedCallback(m_callback_ptr);
+
             //-----------
             //test call to ispc
             //test1
@@ -343,6 +389,18 @@ namespace TestLoadLib
                 {
                     callback_test_ispc.NativeMethods.clear(h, 0, inputData.Length);
                 }
+            }
+        }
+        static void GetManagedDelegate<T>(IntPtr modulePtr, string funcName, out T delOutput)
+        {
+            IntPtr ptr = GetProcAddress(modulePtr, funcName);
+            if (ptr == IntPtr.Zero)
+            {
+                delOutput = default;
+            }
+            else
+            {
+                delOutput = (T)(object)Marshal.GetDelegateForFunctionPointer(ptr, typeof(T));
             }
         }
         static void GetManagedDelegate<T>(IntPtr ptr, out T delOutput)
@@ -380,22 +438,7 @@ namespace TestLoadLib
                 bmp.Save(filename);
             }
         }
-        static bool NeedRebuild(string ispc_module_name)
-        {
-            //ASSUME!
-            return NeedRebuild(ispc_module_name + ".ispc", ispc_module_name + ".dll");
-        }
-        static bool NeedRebuild(string ispc_src, string dllLib)
-        {
-            if (File.Exists(dllLib))
-            {
-                DateTime dllWriteTime = File.GetLastWriteTime(dllLib);
-                DateTime ispcSrcWriteTime = File.GetLastWriteTime(ispc_src);
-                return ispcSrcWriteTime > dllWriteTime;
-            }
-            return true;
 
-        }
 
         [DllImport("Kernel32.dll")]
         static extern IntPtr LoadLibrary(string libraryName);

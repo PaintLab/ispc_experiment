@@ -2,29 +2,26 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-
+using System.Text;
 using BridgeBuilder.Vcx;
 
 namespace BridgeBuilder.Ispc
 {
-    class IspcBuilder
+
+
+    class IspcBuilder : GeneralVcxBuilder
     {
         //helper for Intel® Implicit SPMD Program Compiler (ISPC)
         //see more about ispc =>https://ispc.github.io/
 
-        static string s_MsBuildPath = null;
+
         static string s_ispc = @"D:\projects\ispc-14-dev-windows\bin\ispc.exe";
         static bool s_checkIspc;
 
 
-
-        public ProjectConfigKind ProjectConfigKind { get; set; } = ProjectConfigKind.Debug;
         public string IspcFilename { get; set; }
         public string IspcBridgeFunctionNamePrefix { get; set; } = "my_";
         public string AutoCsTargetFile { get; set; }
-
-        public string[] AdditionalInputItems { get; set; }
-
 
         public void RebuildLibraryAndAPI()
         {
@@ -48,15 +45,11 @@ namespace BridgeBuilder.Ispc
             gen.FullProjBuildPath = tmp_dir;
             string finalProductName = gen.GetFinalProductName(configKind);
 
-            //build ispc                 
-
-            if (!Directory.Exists(tmp_dir))
-            {
-                Directory.CreateDirectory(tmp_dir);
-            }
+            //-----           
+            CreateDirIfNotExists(tmp_dir);
+            //
 
             string ispc_src = IspcFilename;
-
             string ispc_obj = tmp_dir + "/" + onlyProjectName + ".obj";
             string ispc_llvm_text = tmp_dir + "/" + onlyProjectName + "_ispc.llvm.txt";
             string ispc_cpp = tmp_dir + "/" + onlyProjectName + "_ispc.cpp";
@@ -73,27 +66,31 @@ namespace BridgeBuilder.Ispc
             procStartInfo.UseShellExecute = false;
             procStartInfo.RedirectStandardOutput = true;
             procStartInfo.RedirectStandardError = true;
+
             System.Diagnostics.Process proc = System.Diagnostics.Process.Start(procStartInfo);
 
-            var errReader = proc.StandardError;
+
+            StreamReader errReader = proc.StandardError;
             {
                 string line = errReader.ReadLine();
-
                 while (line != null)
                 {
+                    System.Diagnostics.Debug.WriteLine(line);
                     line = errReader.ReadLine();
                 }
             }
-            var outputStrmReader = proc.StandardOutput;
+            StreamReader outputStrmReader = proc.StandardOutput;
             {
                 string line = outputStrmReader.ReadLine();
                 while (line != null)
                 {
+                    System.Diagnostics.Debug.WriteLine(line);
                     line = outputStrmReader.ReadLine();
                 }
             }
 
             proc.WaitForExit();
+
             int exit_code2 = proc.ExitCode;
             if (exit_code2 != 0)
             {
@@ -113,8 +110,6 @@ namespace BridgeBuilder.Ispc
             GenerateCsBinder(cu, ispc_header, cs_method_invoke_filename, Path.GetFileName(finalProductName));
 
             //move cs code to src folder
-
-
             if (AutoCsTargetFile != null)
             {
                 MoveFileOrReplaceIfExists(cs_method_invoke_filename, AutoCsTargetFile);
@@ -132,8 +127,6 @@ namespace BridgeBuilder.Ispc
             {
                 foreach (string s in AdditionalInputItems)
                 {
-
-
                     switch (Path.GetExtension(s))
                     {
                         default: throw new NotSupportedException();
@@ -187,40 +180,7 @@ namespace BridgeBuilder.Ispc
             MoveFileOrReplaceIfExists(finalProductName, Path.GetFileName(finalProductName));
 
         }
-        static void MoveFileOrReplaceIfExists(string src, string dest)
-        {
-            if (File.Exists(dest))
-            {
-                //delete
-                File.Delete(dest);
-            }
-            File.Move(src, dest);
-        }
-        static void UpdateMsBuildPath()
-        {
-            if (s_MsBuildPath != null) { return; }
 
-            string[] msbuildPathTryList = new string[]
-            {
-                @"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
-                @"C:\Program Files (x86)\Microsoft Visual Studio\2019\MSBuild\15.0\Bin\MSBuild.exe"
-            };
-
-            bool foundMsBuild = false;
-            for (int i = msbuildPathTryList.Length - 1; i >= 0; --i)
-            {
-                if (File.Exists(msbuildPathTryList[i]))
-                {
-                    s_MsBuildPath = msbuildPathTryList[i];
-                    foundMsBuild = true;
-                    break;//
-                }
-            }
-            if (!foundMsBuild)
-            {
-                System.Diagnostics.Debug.Write("MSBUILD not found!");
-            }
-        }
 
         static void CheckIspcBinary()
         {
@@ -290,7 +250,7 @@ namespace BridgeBuilder.Ispc
 
             sb.AppendLine("#include <stdio.h>");
             sb.AppendLine("#include <stdlib.h>");
-            sb.AppendLine("//Include the header file that the ispc compiler generates");            
+            sb.AppendLine("//Include the header file that the ispc compiler generates");
             sb.AppendLine($"#include \"{ Path.GetFileName(ispc_headerFilename) }\"");
 
             sb.AppendLine(@"#ifdef _WIN32 
@@ -531,5 +491,22 @@ using uint32_t = System.UInt32;
                 sb.AppendLine(";");
             }
         }
+
+        public static bool NeedRebuildIspc(string ispc_module_name)
+        {
+            //ASSUME!
+            return NeedRebuild(ispc_module_name + ".ispc", ispc_module_name + ".dll");
+        }
+        public static bool NeedRebuild(string ispc_src, string dllLib)
+        {//ASSUME!
+            if (File.Exists(dllLib))
+            {
+                DateTime dllWriteTime = File.GetLastWriteTime(dllLib);
+                DateTime ispcSrcWriteTime = File.GetLastWriteTime(ispc_src);
+                return ispcSrcWriteTime > dllWriteTime;
+            }
+            return true;
+        }
+
     }
 }
