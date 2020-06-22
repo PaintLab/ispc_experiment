@@ -25,6 +25,7 @@ This C# tool chain will ... ( [see the code](https://github.com/PaintLab/ispc_ex
 
 ----
 
+Some outputs from the examples...
 
 ![test_mandelbrot](https://user-images.githubusercontent.com/7447159/85295983-eb29cc80-b4ca-11ea-9919-0aae955d83fb.png)
 _mandelbrot example_
